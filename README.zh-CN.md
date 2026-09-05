@@ -148,6 +148,16 @@ asyncio.run(main())
 
 ## MCP
 
+### 实践案例：云端后端，本地录音
+
+> 转写电脑上的会议录音，准备 Markdown 和 SRT 导出，并保留任务 ID，方便我稍后继续查看。
+
+使用轻量本地 MCP 桥接器将文件上传到云端后端，或先在网页上传，再让远程 Agent 接续已有任务。
+长时间转写由后端持续执行。
+
+**[查看完整案例 →](docs/examples/cloud-backend-local-files.zh-CN.md)**：包含客户端配置、上传流程图、
+工具调用示例、鉴权下载，以及云端聊天附件的访问边界。
+
 ### 连接远程客户端
 
 端点为 `http://localhost:18080/mcp/`，请求头为 `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`。在客户端的 HTTP MCP 配置中填入地址与请求头。

@@ -148,6 +148,16 @@ Reuse an idempotency key when retrying the same submission; use a new key for ch
 
 ## MCP
 
+### Recipe: cloud backend, local recording
+
+> Transcribe the meeting on my laptop. Prepare Markdown and SRT exports, and keep the job ID so I can return later.
+
+Run a lightweight local MCP bridge to upload files to your cloud backend, or upload in the web workspace
+and let a remote agent continue with the existing job. The backend owns the long-running work.
+
+**[Follow the recipe →](docs/examples/cloud-backend-local-files.md)** — client configuration, upload flow,
+example tool calls, and authenticated downloads. Includes the boundaries for cloud-hosted chat attachments.
+
 ### Connect a remote client
 
 Use `http://localhost:18080/mcp/` with `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`. Configure the URL and header using your client's HTTP MCP settings.
