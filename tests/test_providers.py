@@ -159,3 +159,73 @@ def test_normalization_preserves_channels_and_word_punctuation():
     assert result.segments[0].channel_id == 1
     assert result.segments[0].words[0].text == "hello!"
     assert b"00:00:00,100 --> 00:00:00,500" in render(result, "srt")
+
+
+async def test_temporary_upload_keeps_provider_key_off_storage(tmp_path):
+    from voice_ingest.providers.aliyun_upload import AliyunTemporarySource
+
+    class Storage:
+        async def download(self, key, path):
+            path.write_bytes(b"test media")
+
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.method == "GET":
+            assert request.headers["Authorization"] == "Bearer provider-secret"
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "upload_host": "https://test.oss-cn-beijing.aliyuncs.com",
+                        "upload_dir": "temporary/unit",
+                        "oss_access_key_id": "temporary-id",
+                        "signature": "temporary-signature",
+                        "policy": "temporary-policy",
+                        "x_oss_object_acl": "private",
+                        "x_oss_forbid_overwrite": "true",
+                    }
+                },
+            )
+        assert "authorization" not in request.headers
+        assert b"test media" in request.read()
+        return httpx.Response(200)
+
+    source = AliyunTemporarySource(Storage(), settings(), httpx.MockTransport(handler))
+    url = await source.prepare("private-key", "video.mp4", TranscriptionOptions())
+    assert url.startswith("oss://temporary/unit/") and url.endswith(".mp4")
+    assert len(seen) == 2
+
+    provider = AliyunProvider(
+        settings(),
+        httpx.MockTransport(
+            lambda request: httpx.Response(200, json={"output": {"task_id": "temporary-task"}})
+        ),
+    )
+    try:
+        assert await provider.submit(url, TranscriptionOptions(), 1000) == "temporary-task"
+        # Resolution is per request, not a global client header shared across normal requests.
+        assert "X-DashScope-OssResourceResolve" not in provider.client.headers
+    finally:
+        await provider.close()
+
+
+def test_temporary_upload_rejects_untrusted_destination_and_sanitizes_errors(tmp_path):
+    from voice_ingest.providers.aliyun_upload import AliyunTemporarySource
+
+    path = tmp_path / "test.wav"
+    path.write_bytes(b"test")
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, json={"data": {"upload_host": "https://attacker.example/upload"}}
+        )
+    )
+    source = AliyunTemporarySource(None, settings(), transport)
+    with pytest.raises(DomainError, match="Invalid provider upload destination"):
+        source._upload(path, "fun-asr")
+    source.transport = httpx.MockTransport(lambda request: httpx.Response(401))
+    with pytest.raises(DomainError) as error:
+        source._upload(path, "fun-asr")
+    assert not error.value.info.retryable
+    assert "provider-secret" not in str(error.value)

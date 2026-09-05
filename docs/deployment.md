@@ -115,3 +115,42 @@ References:
 A user-supplied key was checked during development with authenticated model-list requests: Token Plan
 returned 401 `InvalidApiKey`; Beijing DashScope returned 200. This is a route/authentication observation,
 not verification of the account's invoice, free quota or subscription balance. No key is saved here.
+
+## Real ASR from a local browser
+
+There are two different credentials:
+
+- `VOICE_API_KEY` is your workspace access key. Enter this in the web connection dialog.
+- `VOICE_ALIYUN_API_KEY` is the regional DashScope key. Keep it in the backend's private `.env`;
+  never put it into the web bundle or use it as a workspace login credential.
+
+The web app uses the same durable task service as CLI and SDK. Connecting the web app does not
+change the backend provider: `VOICE_PROVIDER=mock` returns synthetic text, while
+`VOICE_PROVIDER=aliyun` starts real, potentially billable recognition.
+
+For local evaluation without a public S3 endpoint, configure:
+
+```dotenv
+VOICE_PROVIDER=aliyun
+VOICE_ALIYUN_REGION=beijing
+VOICE_ALIYUN_API_KEY=YOUR_REGIONAL_DASHSCOPE_KEY
+VOICE_ALIYUN_SOURCE_MODE=temporary_upload
+```
+
+Restart both API and worker after editing `.env`. The browser still uploads to the project's private
+S3 bucket; the worker verifies the file, streams a temporary copy to Aliyun's official upload service,
+then submits the ASR job. Raw responses and exports are downloaded back to the project's private S3.
+No public tunnel or externally accessible local MinIO is necessary for this evaluation mode.
+The browser must still be able to reach the configured S3 URL and pass its CORS preflight.
+
+Temporary staging happens in `preparing`, before the billable submission boundary. A staging failure
+can retry; an uncertain ASR submission still becomes `needs_attention` and never silently resubmits.
+The source mode is captured with each provider attempt. Upload clients do not forward the DashScope
+API key to OSS. Files are streamed via bounded buffers and temporary disk files, with worker heartbeats
+remaining active during staging.
+
+**Production uses `VOICE_ALIYUN_SOURCE_MODE=signed_url` (the default)** and a stable, provider-reachable
+S3 origin. Aliyun documents its temporary URLs as valid for 48 hours and explicitly excludes this
+upload facility from production/high-concurrency/load testing. See the
+[official API source-file requirements](https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api).
+Do not treat a successful temporary-upload run as public S3 or production deployment acceptance.

@@ -1,0 +1,7 @@
+node_modules
+tools/node_modules
+dist
+.env*
+playwright-report
+test-results
+.openapi.json

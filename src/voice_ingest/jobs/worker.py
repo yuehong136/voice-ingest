@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from voice_ingest.media.probe import MediaProbe
 from voice_ingest.media.service import UploadService
+from voice_ingest.media.source import SignedSource, SourcePreparer
 from voice_ingest.media.storage import S3Storage
 from voice_ingest.providers.base import ASRProvider, SubmissionUnknown, normalize, validate_options
 from voice_ingest.runtime.database import (
@@ -41,9 +42,11 @@ class Worker:
         provider: ASRProvider,
         probe: MediaProbe,
         settings: Settings,
+        source: SourcePreparer | None = None,
     ):
         self.sessions, self.storage, self.provider = sessions, storage, provider
         self.probe, self.settings, self.id = probe, settings, uid()
+        self.source = source or SignedSource(storage)
         self.stopping = asyncio.Event()
 
     async def claim(self) -> Job | None:
@@ -267,7 +270,7 @@ class Worker:
                     saved.media_info, saved.duration_ms = info, info["duration_ms"]
                 asset.media_info, asset.duration_ms = info, info["duration_ms"]
             validate_options(options, asset.duration_ms, asset.size, asset.media_info["format"])
-            url = self.storage.sign_download(asset.object_key)
+            url = await self.source.prepare(asset.object_key, asset.filename, options)
             if not await self.checkpoint(job, "submitting", expected="preparing", error=None):
                 return
             task_id = await self.provider.submit(url, options, asset.duration_ms or 0)

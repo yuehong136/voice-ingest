@@ -112,3 +112,27 @@ Official integration references (verified 2026-09-05):
 - [Aliyun model limits](https://help.aliyun.com/zh/model-studio/asr-model/)
 - [FastMCP 4 migration guide](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-3)
 - [S3 multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html)
+
+## Optional browser workspace
+
+`web/` is a React SPA served separately from the Python package. It consumes generated OpenAPI types
+and the existing `/v1` API; there is no parallel job state machine. Same-origin `/api` proxies keep
+service authentication simple. Presigned uploads go directly to S3 and require storage-side CORS.
+Service credentials are held in page memory, and TanStack Query caches are cleared on workspace
+changes. A Web Worker hashes bounded file chunks. Browser resume records contain only identifiers
+and digests, and submission idempotency is persisted before creating a job. The default interactive
+preview uses explicitly labeled synthetic fixtures and never sends user audio to a cloud provider.
+
+## Provider-readable source preparation
+
+The worker uses a small `SourcePreparer` boundary after media validation and before the durable
+`submitting` checkpoint. The default `signed_url` strategy signs the confirmed private S3 object.
+An explicit `temporary_upload` strategy supports local Aliyun evaluation when S3 is not publicly
+reachable: it stages the object through disk and a streaming upload to the official temporary store.
+The upload runs outside database transactions and off the event loop so lease heartbeats continue.
+Only the policy endpoint receives the model API key; storage requests never receive it.
+
+Staging failures can retry without repeating a billable ASR submission. Existing cancellation and
+generation fences still gate submission, and uncertain submission outcomes retain `needs_attention`.
+Each attempt records its source mode. Temporary storage is not a production transport; production
+continues to require provider-accessible signed S3 URLs.

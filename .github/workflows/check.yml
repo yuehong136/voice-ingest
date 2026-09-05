@@ -11,3 +11,20 @@ jobs:
       - run: uv sync --all-extras --frozen
       - run: make check
       - run: uv build
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - run: npx playwright install --with-deps chrome
+      - run: npm test

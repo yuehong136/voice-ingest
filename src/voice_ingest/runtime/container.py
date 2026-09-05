@@ -5,6 +5,7 @@ from voice_ingest.media.probe import MediaProbe
 from voice_ingest.media.service import UploadService
 from voice_ingest.media.storage import S3Storage
 from voice_ingest.providers.aliyun import AliyunProvider
+from voice_ingest.providers.aliyun_upload import AliyunTemporarySource
 from voice_ingest.providers.mock import MockProvider
 from voice_ingest.runtime.database import database
 from voice_ingest.runtime.settings import Settings
@@ -34,6 +35,11 @@ class Runtime:
             self.provider,
             MediaProbe(self.storage, settings.ffprobe_binary),
             settings,
+            source=(
+                AliyunTemporarySource(self.storage, settings)
+                if settings.aliyun_source_mode == "temporary_upload"
+                else None
+            ),
         )
 
     async def close(self):

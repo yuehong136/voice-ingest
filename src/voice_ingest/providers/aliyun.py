@@ -71,11 +71,14 @@ class AliyunProvider:
             parameters["speaker_count"] = options.speaker_count
         if options.language_hints:
             parameters["language_hints"] = options.language_hints
+        headers = {"X-DashScope-Async": "enable"}
+        if url.startswith("oss://"):
+            headers["X-DashScope-OssResourceResolve"] = "enable"
         response = await self._request(
             "POST",
             "services/audio/asr/transcription",
             submitting=True,
-            headers={"X-DashScope-Async": "enable"},
+            headers=headers,
             json={"model": options.model, "input": source, "parameters": parameters},
         )
         task_id = response.get("output", {}).get("task_id")

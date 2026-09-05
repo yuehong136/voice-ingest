@@ -21,3 +21,8 @@ dist/
 *.mp4
 *.flac
 *.ogg
+node_modules/
+web/.openapi.json
+web/playwright-report/
+web/test-results/
+*.tsbuildinfo

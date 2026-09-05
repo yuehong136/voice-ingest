@@ -71,9 +71,23 @@ VOICE_ALIYUN_API_KEY=YOUR_REGIONAL_DASHSCOPE_KEY
 VOICE_S3_PUBLIC_ENDPOINT=https://files.example.com
 ```
 
-文件地址必须实际连接到 S3 服务，并可被客户端和阿里访问；`localhost` 无法供云端识别读取。支持 HTTP 和 HTTPS，公网部署请使用 HTTPS。S3 内网访问地址与公网签名地址分别配置。
+在默认 `signed_url` 模式下，文件地址必须实际连接到 S3 服务，并可被客户端和阿里访问；`localhost` 无法供云端识别读取。支持 HTTP 和 HTTPS，公网部署请使用 HTTPS。S3 内网访问地址与公网签名地址分别配置。
+
+本地没有公网 S3 时，可设置 `VOICE_ALIYUN_SOURCE_MODE=temporary_upload` 并重启 API 和 worker，使用阿里官方临时文件服务完成真实转写测试。此模式仅用于本地评估，生产环境保持默认 `signed_url`。详见[本地浏览器配置](docs/deployment.md#real-asr-from-a-local-browser)。
 
 **计费通道：** 当前适配常规 DashScope ASR，未接入 Token Plan / Coding Plan，也不会在计费通道间自动回退。`VOICE_API_KEY` 用于访问你的后端，`VOICE_ALIYUN_API_KEY` 用于后端调用阿里。详见[部署与凭证配置](docs/deployment.md)。
+
+## Web 演示工作台
+
+可选的 [React 前端](web/README.md) 提供交互式示例工作区，并可连接真实 API 完成上传、查看进度、搜索正文和导出。默认英文，侧栏可切换中文。
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+打开 http://127.0.0.1:5174 即可无密钥体验示例；连接后端并输入服务密钥后可处理真实录音。存储 CORS、部署与测试见[前端指南](web/README.md)。
 
 ## CLI
 
@@ -231,7 +245,7 @@ uv build
 
 ## 范围与文档
 
-当前版本聚焦共享可信工作区中的离线 ASR，尚未实现实时识别、TTS、前端、多租户或知识库自动入库。TTS 是后续方向，暂无承诺的发布日期。
+当前版本聚焦共享可信工作区中的离线 ASR，尚未实现实时识别、TTS、多租户或知识库自动入库。TTS 是后续方向，暂无承诺的发布日期。
 
 | 文档 | 内容 |
 | --- | --- |

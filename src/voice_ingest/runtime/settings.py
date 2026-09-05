@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     aliyun_region: Literal["beijing", "singapore"] = "beijing"
     aliyun_workspace_id: str | None = None
     aliyun_api_key: SecretStr = SecretStr("")
+    aliyun_source_mode: Literal["signed_url", "temporary_upload"] = "signed_url"
     max_inflight: int = Field(default=2, ge=1, le=100)
     lease_seconds: int = Field(default=90, ge=15)
     poll_seconds: float = Field(default=5, ge=0.1)
@@ -49,6 +50,8 @@ class Settings(BaseSettings):
                 )
         if self.provider == "aliyun" and not self.aliyun_api_key.get_secret_value():
             raise ValueError("VOICE_ALIYUN_API_KEY must be configured")
+        if self.aliyun_source_mode == "temporary_upload" and self.provider != "aliyun":
+            raise ValueError("temporary_upload requires VOICE_PROVIDER=aliyun")
         if self.provider == "aliyun" and self.aliyun_api_key.get_secret_value().startswith(
             "sk-sp-"
         ):

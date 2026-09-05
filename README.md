@@ -71,9 +71,23 @@ VOICE_ALIYUN_API_KEY=YOUR_REGIONAL_DASHSCOPE_KEY
 VOICE_S3_PUBLIC_ENDPOINT=https://files.example.com
 ```
 
-The file endpoint must actually route to your S3 service and be reachable by clients and Aliyun. `localhost` cannot serve cloud recognition. HTTP and HTTPS origins are supported; use HTTPS for public deployments. Internal storage access and public signing endpoints are configured separately.
+In the default `signed_url` mode, the file endpoint must actually route to your S3 service and be reachable by clients and Aliyun. `localhost` cannot serve cloud recognition. HTTP and HTTPS origins are supported; use HTTPS for public deployments. Internal storage access and public signing endpoints are configured separately.
+
+For local real-ASR evaluation without public S3, set `VOICE_ALIYUN_SOURCE_MODE=temporary_upload` and restart the API and worker. The worker uses Aliyun’s official temporary file service; this mode is for local evaluation only. Production keeps the default `signed_url` mode. See [local browser setup](docs/deployment.md#real-asr-from-a-local-browser).
 
 **Billing:** This adapter uses regular DashScope ASR. Token Plan / Coding Plan is not integrated, and there is no automatic fallback between billing channels. `VOICE_API_KEY` protects your backend; `VOICE_ALIYUN_API_KEY` authenticates the backend to Aliyun. See [deployment and credential configuration](docs/deployment.md).
+
+## Web workspace
+
+The optional [React frontend](web/README.md) provides an interactive sample workspace and connects to the real API for uploads, job progress, transcript search and exports. English is the default; Chinese is available in the sidebar.
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:5174 for a credential-free demo. Connect your backend with its service key to use actual recordings. See the [web guide](web/README.md) for storage CORS, deployment and tests.
 
 ## CLI
 
@@ -231,7 +245,7 @@ Read [AGENTS.md](AGENTS.md) before coding. Modules are organized by capability (
 
 ## Scope and documentation
 
-The current release focuses on offline ASR for a shared, trusted workspace. Realtime recognition, TTS, a frontend, multi-tenancy, and automatic knowledge-base ingestion are outside the current implementation. TTS is a future direction, without a committed release date.
+The current release focuses on offline ASR for a shared, trusted workspace. Realtime recognition, TTS, multi-tenancy, and automatic knowledge-base ingestion are outside the current implementation. TTS is a future direction, without a committed release date.
 
 | Document | Contents |
 | --- | --- |

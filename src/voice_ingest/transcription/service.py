@@ -79,6 +79,7 @@ class TranscriptionService:
             region=self.settings.aliyun_region,
             request={
                 "options": job.options,
+                "source_mode": self.settings.aliyun_source_mode,
                 "asset_id": job.asset_id,
                 "endpoint": self.settings.aliyun_base_url
                 if self.settings.provider == "aliyun"

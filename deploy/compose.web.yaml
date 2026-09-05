@@ -1,0 +1,10 @@
+services:
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:18081:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+    networks: [voice]

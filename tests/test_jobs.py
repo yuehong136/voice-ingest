@@ -168,3 +168,42 @@ async def test_deleted_results_stay_unavailable(env, asset):
         Bucket=env.settings.s3_bucket, Prefix=f"results/{job.id}/"
     )
     assert not response.get("Contents")
+
+
+async def test_source_staging_retries_before_billable_submission(env, asset):
+    class Source:
+        calls = 0
+
+        async def prepare(self, key, filename, options):
+            self.calls += 1
+            if self.calls == 1:
+                raise DomainError("source_unavailable", "Retry source upload", 503, True)
+            return "oss://temporary/staged-audio"
+
+    source = Source()
+    env.worker.source = source
+    created = await env.transcriptions.create(CreateTranscription(asset_id=asset), "staging-retry")
+    await env.worker.tick()
+    current = await env.transcriptions.get(created.id)
+    assert current.state == "preparing"
+    async with env.sessions() as session:
+        saved = await session.get(Job, created.id)
+        assert saved.provider_task_id is None
+    await finish(env, created.id)
+    assert source.calls == 2
+
+
+async def test_cancel_during_staging_does_not_submit_to_provider(env, asset):
+    created = await env.transcriptions.create(CreateTranscription(asset_id=asset), "cancel-staging")
+
+    class Source:
+        async def prepare(self, key, filename, options):
+            await env.transcriptions.cancel(created.id)
+            return "oss://temporary/cancelled-audio"
+
+    env.worker.source = Source()
+    await env.worker.tick()
+    assert (await env.transcriptions.get(created.id)).state == "cancelled"
+    async with env.sessions() as session:
+        saved = await session.get(Job, created.id)
+        assert saved.provider_task_id is None
