@@ -1,0 +1,14 @@
+.git
+.idea
+.venv
+.env
+.env.*
+.local
+__pycache__
+.pytest_cache
+.ruff_cache
+dist
+tests
+*.wav
+*.mp3
+*.m4a

@@ -1,0 +1,79 @@
+name: voice-ingest
+
+x-runtime: &runtime
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  env_file: ../.env
+  environment:
+    VOICE_DATABASE_URL: postgresql+asyncpg://voice:${VOICE_DB_PASSWORD:?set VOICE_DB_PASSWORD}@postgres:5432/voice
+    VOICE_S3_ENDPOINT: http://s3:9000
+  networks: [voice]
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: voice
+      POSTGRES_PASSWORD: ${VOICE_DB_PASSWORD:?set VOICE_DB_PASSWORD}
+      POSTGRES_DB: voice
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U voice -d voice"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [voice]
+
+  s3:
+    image: ${VOICE_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-06-13T11-33-47Z}
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${VOICE_S3_ACCESS_KEY:?set VOICE_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${VOICE_S3_SECRET_KEY:?set VOICE_S3_SECRET_KEY}
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:19000:9000"]
+    volumes: [s3-data:/data]
+    restart: unless-stopped
+    networks: [voice]
+
+  migrate:
+    <<: *runtime
+    command: alembic upgrade head
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  storage-init:
+    <<: *runtime
+    command: python deploy/init_storage.py
+    depends_on: [s3]
+
+  api:
+    <<: *runtime
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:18080:18080"]
+    command: voice-ingest-server
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:18080/health/ready', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    <<: *runtime
+    command: voice-ingest-worker
+    stop_grace_period: 180s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      storage-init: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+networks:
+  voice:
+
+volumes:
+  postgres-data:
+  s3-data:

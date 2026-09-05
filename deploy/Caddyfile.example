@@ -1,0 +1,8 @@
+# Optional future HTTPS edge. Do not start on ports occupied by another service.
+api.example.com {
+    reverse_proxy 127.0.0.1:18080
+}
+files.example.com {
+    # Preserve the Host/path/query used when generating S3 signatures.
+    reverse_proxy 127.0.0.1:19000
+}
