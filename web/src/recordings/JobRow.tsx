@@ -46,7 +46,10 @@ export function JobRow({
               : 'Sample recording'}
         </span>
       </span>
-      <span className={`status-dot ${job.state}`} title={labels[job.state]?.[zh ? 1 : 0]} />
+      <span className={`row-status ${job.state}`}>
+        <span className={`status-dot ${job.state}`} />
+        {labels[job.state]?.[zh ? 1 : 0]}
+      </span>
     </button>
   )
 }

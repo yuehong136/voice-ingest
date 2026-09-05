@@ -122,6 +122,9 @@ Service credentials are held in page memory, and TanStack Query caches are clear
 changes. A Web Worker hashes bounded file chunks. Browser resume records contain only identifiers
 and digests, and submission idempotency is persisted before creating a job. The default interactive
 preview uses explicitly labeled synthetic fixtures and never sends user audio to a cloud provider.
+It is now an explicit action from the disconnected entry screen. Browser upload completion stops at
+a review step; only a separate submit action starts ASR. A single pending upload is retained in page
+memory, with completed-upload recovery through the existing file fingerprint record after reload.
 
 ## Provider-readable source preparation
 

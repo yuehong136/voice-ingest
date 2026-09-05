@@ -19,11 +19,19 @@ const job = {
 async function connect(page: Page) {
   await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
   await page.getByLabel('Workspace access key').fill('browser-test-key')
-  await page.getByRole('button', { name: 'Connect workspace', exact: true }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Connect workspace', exact: true })
+    .click()
 }
 test('demo supports search, exports, language switching and narrow screens', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Your audio, in words.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Transcriptions', exact: true })).toBeVisible()
+  await expect(page.locator('.segment')).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole('button', { name: 'Explore sample transcript' }).click()
   await page.getByLabel('Search loaded transcript').fill('timestamps')
   await expect(page.locator('.segment')).toHaveCount(1)
   await page.getByLabel('Clear search').click()
@@ -32,7 +40,7 @@ test('demo supports search, exports, language switching and narrow screens', asy
   await page.getByRole('button', { name: 'Export', exact: true }).click()
   expect((await exported).suggestedFilename()).toBe('sample-transcript.md')
   await page.getByRole('button', { name: '中文', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '把声音，变成文字。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '转写工作台' })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.getByRole('button', { name: '连接后端', exact: true }).click()
@@ -104,15 +112,31 @@ test('upload submits one idempotent job and does not forward credentials to stor
     mimeType: 'audio/wav',
     buffer: Buffer.from('small audio test fixture'),
   })
-  await page.getByRole('button', { name: 'Upload & transcribe' }).click()
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click()
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible()
+  expect(submitCount).toBe(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Start transcription', exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole('button', { name: 'Transcribe later', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Continue setup', exact: true }).click()
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible()
+  await page.getByRole('button', { name: 'Start transcription', exact: true }).click()
   await expect(page.getByText('Upload worked.', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Processing', exact: true }).click()
+  await expect(page.getByText('No recordings in this view.')).toBeVisible()
+  await page.getByRole('button', { name: 'All', exact: true }).click()
   await page.getByRole('button', { name: 'New transcription', exact: true }).first().click()
   await page.getByLabel('Choose audio').setInputFiles({
     name: 'meeting.wav',
     mimeType: 'audio/wav',
     buffer: Buffer.from('small audio test fixture'),
   })
-  await page.getByRole('button', { name: 'Upload & transcribe' }).click()
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click()
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible()
+  await page.getByRole('button', { name: 'Start transcription', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(puts).toBe(1)
   expect(submitCount).toBe(1)
@@ -151,7 +175,10 @@ test('real browser uploads to private MinIO and observes a durable mock job', as
   await page.goto('/')
   await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
   await page.getByLabel('Workspace access key').fill(process.env.VOICE_WEB_TEST_KEY!)
-  await page.getByRole('button', { name: 'Connect workspace', exact: true }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Connect workspace', exact: true })
+    .click()
   await expect(page.locator('.live-banner')).toContainText('Mock provider')
   const samples = 16000 * 4
   const wav = Buffer.alloc(44 + samples * 2)
@@ -173,7 +200,9 @@ test('real browser uploads to private MinIO and observes a durable mock job', as
   await page
     .getByLabel('Choose audio')
     .setInputFiles({ name: `browser-${Date.now()}.wav`, mimeType: 'audio/wav', buffer: wav })
-  await page.getByRole('button', { name: 'Upload & transcribe' }).click()
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click()
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible()
+  await page.getByRole('button', { name: 'Start transcription', exact: true }).click()
   await expect(page.locator('.status-badge')).toHaveText('Ready', { timeout: 30000 })
   await expect(page.locator('.segment').first()).toContainText('MOCK')
   const exported = page.waitForEvent('download')

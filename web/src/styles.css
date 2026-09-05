@@ -6,7 +6,7 @@
     'PingFang SC',
     sans-serif;
   color: #263651;
-  background: #f3f6fa;
+  background: #f5f7fa;
   font-synthesis: none;
   font-weight: 400;
   font-size: 14px;
@@ -86,7 +86,7 @@ button:hover:not(:disabled) {
 }
 .sidebar {
   width: 234px;
-  background: #fff;
+  background: #f0f3f8;
   position: fixed;
   inset: 0 auto 0 0;
   border-right: 1px solid var(--line);
@@ -280,7 +280,7 @@ main {
 .workspace-content {
   max-width: 1520px;
   margin: auto;
-  padding: 37px 38px 18px;
+  padding: 28px 30px 18px;
 }
 .page-heading {
   display: flex;
@@ -291,7 +291,7 @@ main {
 }
 .page-heading h1 {
   font-family: 'Manrope Variable', 'PingFang SC', sans-serif;
-  font-size: 29px;
+  font-size: 27px;
   letter-spacing: -1.2px;
   line-height: 1.5;
   font-weight: 750;
@@ -360,7 +360,7 @@ main {
 }
 .studio {
   display: grid;
-  grid-template-columns: 273px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   border: 1px solid #dfe6f0;
   border-radius: 12px;
   background: white;
@@ -716,8 +716,8 @@ main {
   background: #9989bc;
 }
 .segment p {
-  font-size: 13px;
-  line-height: 1.85;
+  font-size: 15px;
+  line-height: 1.9;
   margin-top: 7px;
   color: #4e5c72;
   max-width: 75ch;
@@ -1317,5 +1317,262 @@ dialog form > p {
   *::after {
     animation: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* The transcript is the primary canvas; navigation and metadata stay quiet. */
+.welcome-panel {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 50px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 64px 46px;
+  min-height: 480px;
+}
+.welcome-copy > svg {
+  color: var(--blue);
+  margin-bottom: 24px;
+}
+.welcome-copy h2 {
+  font-size: 30px;
+  line-height: 1.3;
+  letter-spacing: -0.8px;
+  max-width: 20ch;
+}
+.welcome-copy > p {
+  margin-top: 20px;
+  line-height: 1.85;
+  color: var(--muted);
+  max-width: 48ch;
+}
+.welcome-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+.welcome-flow {
+  list-style: none;
+  padding: 0 0 0 28px;
+  margin: 0;
+  border-left: 1px solid var(--line);
+}
+.welcome-flow li {
+  display: flex;
+  gap: 16px;
+  padding: 24px 0;
+}
+.welcome-flow li > span {
+  color: var(--blue);
+  border: 1px solid #c6d5ec;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.welcome-flow h3 {
+  font-size: 15px;
+  margin: 3px 0 8px;
+}
+.welcome-flow p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.library-filters {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 0 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.library-filters button {
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.library-filters button[aria-pressed='true'] {
+  background: #e6edf9;
+  color: #234f9c;
+  font-weight: 650;
+}
+.row-status {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.row-status .status-dot {
+  margin: 0;
+}
+.recording {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px 10px;
+}
+.recording .row-status {
+  grid-column: 2;
+  margin: 0;
+}
+.pending-upload {
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid #a7c9ba;
+  border-radius: 8px;
+  background: #f0f8f4;
+  text-align: left;
+  justify-content: flex-start;
+}
+.pending-upload span {
+  min-width: 0;
+}
+.pending-upload strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 190px;
+  font-size: 12px;
+}
+.pending-upload small {
+  display: block;
+  color: #37654f;
+  margin-top: 6px;
+}
+.job-reference {
+  font-size: 11px;
+  margin-top: 12px;
+  color: var(--blue);
+}
+.job-details {
+  font-size: 11px;
+  margin-top: 10px;
+  color: var(--muted);
+}
+.job-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.job-details dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  line-height: 1.6;
+}
+.job-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.upload-steps {
+  display: flex;
+  list-style: none;
+  padding: 0 0 20px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+  gap: 24px;
+}
+.upload-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.upload-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.upload-steps .current {
+  color: var(--blue);
+  font-weight: 650;
+}
+.upload-steps .current > span {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+}
+.upload-steps .done {
+  color: var(--green);
+}
+.upload-ready {
+  display: flex;
+  gap: 12px;
+  background: #f1f8f5;
+  border: 1px solid #c9e2d6;
+  border-radius: 8px;
+  padding: 18px;
+  color: #27664c;
+}
+.upload-ready > div {
+  min-width: 0;
+}
+.upload-ready strong {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.upload-ready p {
+  font-size: 12px;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.asset-reference {
+  display: block;
+  margin-top: 14px;
+  font-size: 11px;
+}
+.asset-reference input {
+  display: block;
+  width: 100%;
+  background: white;
+  color: var(--ink);
+  border: 1px solid #c9e2d6;
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+@media (max-width: 1100px) {
+  .welcome-panel {
+    gap: 24px;
+    padding: 32px 24px;
+  }
+  .welcome-copy h2 {
+    font-size: 25px;
+  }
+}
+@media (max-width: 700px) {
+  .welcome-panel {
+    grid-template-columns: 1fr;
+  }
+  .welcome-flow {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
+  }
+  .welcome-flow li {
+    padding: 16px 0;
+  }
+  .job-details dl {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .job-details dd {
+    margin-bottom: 8px;
+  }
+  .upload-steps {
+    gap: 16px;
   }
 }

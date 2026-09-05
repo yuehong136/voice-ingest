@@ -1,6 +1,6 @@
 # Voice Ingest Web
 
-An optional English/Chinese workspace for the existing API. Start in a clearly labeled demo with synthetic transcripts, then connect to a backend for actual uploads and durable jobs.
+An English/Chinese transcription workspace for the existing API. The entry screen connects to your real workspace; synthetic sample transcripts are available through an explicit preview action.
 
 ## Run locally
 
@@ -17,12 +17,23 @@ Open http://127.0.0.1:5174. Demo mode needs no backend or credentials. For actua
 
 - React 19, Vite 8, TypeScript 7 and TanStack Query 5; exact versions are in `package-lock.json`.
 - Service keys stay in memory. Reloading requires reconnecting. Audio and transcripts are never persisted by the frontend.
+- Upload and recognition are separate actions: **Upload file**, then review settings and **Start transcription**. Uploading alone never starts ASR.
+- **Transcribe later** keeps one pending file in this tab. Reopen **Continue setup** to submit, or select the displayed asset ID for an agent. After reloading, reconnect and re-select the same file to recover its completed upload; this is not a server-wide asset library.
+- Filter loaded jobs by processing, ready or attention status. Task details expose asset/job IDs and submission time; copy the job ID for MCP follow-up.
 - A worker computes SHA-256 in 2 MiB chunks. Upload uses four concurrent 16 MiB parts and refreshes part signatures on rejected requests.
 - Re-select the same file to resume. Browser storage holds hashed workspace/file identity, upload IDs and submission idempotency keys. Disabling storage disables durable browser resume.
 - Cancel during upload pauses the client operation. Incomplete uploads expire according to backend policy. Submitted jobs survive closing the browser.
 - Live text is fetched in pages of 50 segments. Search applies to loaded text only. Exports retrieve the entire backend result.
 - Local playback is available for audio uploaded in the current tab; source download for older jobs is not exposed by the backend API.
 - This first web iteration handles one upload at a time; CLI batch workflows remain available.
+
+### Customer walkthrough
+
+Connect the workspace, upload a recording, and show the completed-upload confirmation before starting
+recognition. Explain the model/language/speaker settings, then start the job. Review its status and
+original timestamps, search loaded text, and export Markdown or subtitles. Use **Task details** to
+continue the same job with an agent. For a walkthrough without cloud charges, use the explicitly
+labeled sample transcript or deploy with the mock provider. Do not present synthetic text as ASR output.
 
 ## S3 browser access
 

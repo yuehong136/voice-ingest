@@ -118,7 +118,10 @@ does not start recognition; submitting to a real provider may incur charges.
 
 Remote MCP operates on managed assets and jobs; it cannot read `/Users/...` on your laptop or upload an
 arbitrary remote URL. If you uploaded through the SDK/API without submitting, pass the returned `asset_id`
-to `submit_transcription`. The current web workflow already submits the job, so it needs no second submission.
+to `submit_transcription`. The web upload review also exposes this asset ID: choose **Transcribe later**
+to hand it to an agent before recognition. If you clicked **Start transcription** in the web workspace,
+use its existing job instead of submitting again. Pending upload setup stays in this tab; after a refresh,
+re-select the same file to recover it.
 
 ## Return later and download the result
 

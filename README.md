@@ -79,7 +79,7 @@ For local real-ASR evaluation without public S3, set `VOICE_ALIYUN_SOURCE_MODE=t
 
 ## Web workspace
 
-The optional [React frontend](web/README.md) provides an interactive sample workspace and connects to the real API for uploads, job progress, transcript search and exports. English is the default; Chinese is available in the sidebar.
+The optional [React frontend](web/README.md) provides a transcription workspace with separate upload and recognition steps, status filters, transcript search and five export formats. English is the default; Chinese is available in the sidebar.
 
 ```bash
 cd web
@@ -87,7 +87,7 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5174 for a credential-free demo. Connect your backend with its service key to use actual recordings. See the [web guide](web/README.md) for storage CORS, deployment and tests.
+Open http://127.0.0.1:5174 and connect your workspace with its service key, or explicitly explore a sample transcript without credentials. Uploading stops at a review step; **Start transcription** submits the job. See the [web guide](web/README.md) for a customer walkthrough, storage CORS, deployment and tests.
 
 ## CLI
 

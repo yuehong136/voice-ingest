@@ -48,10 +48,10 @@ function save(key: string, value: Record<string, string>) {
     throw new Error('Browser storage is unavailable. Enable site storage to resume safely.')
   }
 }
-export async function uploadAndSubmit(
+export type PreparedUpload = { assetId: string; submissionPrefix: string }
+export async function uploadFile(
   api: Api,
   file: File,
-  options: Options,
   signal: AbortSignal,
   progress: (p: Progress) => void,
 ) {
@@ -125,8 +125,15 @@ export async function uploadAndSubmit(
       signal,
     })
   }
-  progress({ stage: 'submitting', percent: 100 })
-  const submissionKey = `${prefix}:${JSON.stringify(options)}`
+  return { assetId: upload.asset_id!, submissionPrefix: prefix }
+}
+export async function submitUploaded(
+  api: Api,
+  uploaded: PreparedUpload,
+  options: Options,
+  signal: AbortSignal,
+) {
+  const submissionKey = `${uploaded.submissionPrefix}:${JSON.stringify(options)}`
   const submission = load(submissionKey)
   if (submission.job) return api.request<Job>(`/v1/transcriptions/${submission.job}`, { signal })
   const idempotency = submission.idempotency || crypto.randomUUID()
@@ -135,7 +142,7 @@ export async function uploadAndSubmit(
     method: 'POST',
     signal,
     headers: { 'Idempotency-Key': idempotency },
-    body: JSON.stringify({ asset_id: upload.asset_id, options }),
+    body: JSON.stringify({ asset_id: uploaded.assetId, options }),
   })
   save(submissionKey, { idempotency, job: job.id })
   return job

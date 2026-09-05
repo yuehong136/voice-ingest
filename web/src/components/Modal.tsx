@@ -20,7 +20,11 @@ export function Modal({
     <dialog ref={ref} onCancel={close} aria-labelledby="modal-title">
       <header>
         <h2 id="modal-title">{title}</h2>
-        <button className="icon-button" onClick={close} aria-label="Close">
+        <button
+          className="icon-button"
+          onClick={close}
+          aria-label={document.documentElement.lang === 'zh-CN' ? '关闭' : 'Close'}
+        >
           <X size={20} />
         </button>
       </header>

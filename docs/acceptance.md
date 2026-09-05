@@ -74,3 +74,18 @@ against the mock environment. Paid acceptance used a separate browser flow.
 This verifies the persistent product workflow beyond the earlier standalone provider script.
 Temporary storage remains local evaluation only; production public S3 URLs, HTTPS and full Compose
 startup still require deployment acceptance.
+
+## Customer workspace UX (2026-09-05)
+
+The disconnected entry now offers real workspace access and an explicit synthetic-preview action.
+Uploads stop at a completed-file review step; recognition requires a separate **Start transcription**
+action. **Transcribe later** retains one pending file in the current tab, and the asset ID is exposed
+for MCP hand-off. Loaded jobs have status filters, readable status labels, copyable job IDs and task details.
+
+Browser regression checks cover zero transcription submissions at upload completion, closing and
+reopening pending setup, same-file idempotent reuse, unsigned storage authorization, status filtering,
+sample opt-in, bilingual UI and 390-pixel layouts. Four browser tests passed; the opt-in live mock
+infrastructure test was skipped against the currently configured paid backend. Existing real results
+were inspected in the browser; no additional paid recognition was submitted for this UI revision.
+Desktop and mobile entry, reader and upload layouts were reviewed. This revision does not add a
+server-wide asset library or persistent browser credentials.
