@@ -94,13 +94,15 @@ sequenceDiagram
 | --- | --- | --- |
 | `list_models` | `{}` | 已配置的模型能力 |
 | `upload_local_audio` | `{"path":"/Users/alex/Recordings/meeting.mp4"}` | 文件记录，其 `id` 即 `asset_id` |
-| `submit_transcription` | `{"asset_id":"ASSET_ID","idempotency_key":"UNIQUE_KEY_FOR_THIS_REQUEST"}` | 任务记录，其 `id` 即 `job_id` |
+| `submit_transcription` | `{"asset_id":"ASSET_ID"}` | 任务记录，其 `id` 即 `job_id` |
 | `get_transcription` | `{"job_id":"JOB_ID"}` | 持久化任务状态 |
 | `read_transcript` | `{"job_id":"JOB_ID","limit":50}` | 一页句段，通过 `next_cursor` 继续读取 |
 | `export_transcript` | `{"job_id":"JOB_ID","format":"markdown"}` | 需要鉴权的 API 下载路径 |
 
 实际调用使用上一步返回的 ID，不能照搬占位符。等待 `succeeded` 后读取和导出；第二份导出使用 `srt`。
-同一次提交丢失网络响应时复用原幂等键。单独上传不会开始识别，向真实供应商提交转写可能产生费用。
+省略可选的 `idempotency_key` 时，MCP 自动按文件和规范化参数生成稳定键。网络响应丢失、
+重连或任务完成后重复调用都会返回同一任务。修改参数会创建不同任务；只有明确需要对相同文件和参数
+重新识别时才传入新键，该次请求的网络重试复用此键。单独上传不会开始识别，向真实供应商提交转写可能产生费用。
 
 ## 案例 B：网页上传，云端 Agent 接续处理
 

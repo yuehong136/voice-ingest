@@ -30,6 +30,13 @@ result and provider contracts are defined; no speculative TTS endpoints are incl
 
 ## Upload consistency
 
+MCP submissions default to a versioned SHA-256 key derived from asset ID and validated options,
+with defaults materialized and JSON keys sorted. Both MCP transports use the same derivation and
+existing database uniqueness constraint; no process/session cache is involved. Automatic reuse
+applies to all job states, including completed jobs. Explicit keys retain conflict checking and allow
+intentional new recognition; failed jobs use the existing retry operation. This does not deduplicate
+separate asset IDs with identical bytes, or submissions made under different explicit keys.
+
 An upload allocates an immutable object key and durable asset record before opening an S3 multipart
 session. The client hashes files in a thread, uploads at most four 16 MiB chunks concurrently, and
 persists only file fingerprints and server upload IDs. The server reads authoritative S3 part lists;

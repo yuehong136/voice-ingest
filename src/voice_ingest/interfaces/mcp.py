@@ -1,8 +1,11 @@
 """Small agent-oriented tools; business jobs are independent of MCP task/session state."""
 
-from typing import Any
+import hashlib
+import json
+from typing import Annotated, Any
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from voice_ingest.transcription.contracts import (
     CreateTranscription,
@@ -26,13 +29,26 @@ def register_tools(mcp: FastMCP, backend: Any):
 
     @mcp.tool(annotations={**WRITE, "idempotentHint": True})
     async def submit_transcription(
-        asset_id: str, idempotency_key: str, options: TranscriptionOptions | None = None
+        asset_id: str,
+        idempotency_key: Annotated[str | None, Field(min_length=1, max_length=200)] = None,
+        options: TranscriptionOptions | None = None,
     ) -> JobView:
-        """Submit a ready asset; returns immediately. Reuse the key on network retry.
+        """Submit a ready asset; returns immediately. Only asset_id is required.
 
+        Omit idempotency_key: identical asset/options reuse the same durable job, even after
+        reconnecting or completion. Changed options create a different job. For an intentional
+        new recognition of the same asset/options, pass a fresh explicit idempotency_key;
+        reuse that explicit key on network retries. Failed jobs require retry_transcription.
         May incur provider charges. Poll get_transcription; disconnecting never cancels the job.
         """
-        return await backend.submit(asset_id, options=options, idempotency_key=idempotency_key)
+        resolved = options or TranscriptionOptions()
+        if idempotency_key is None:
+            request = CreateTranscription(asset_id=asset_id, options=resolved)
+            canonical = json.dumps(
+                request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+            )
+            idempotency_key = "mcp-auto-v1:" + hashlib.sha256(canonical.encode()).hexdigest()
+        return await backend.submit(asset_id, options=resolved, idempotency_key=idempotency_key)
 
     @mcp.tool(annotations=READ)
     async def get_transcription(job_id: str) -> JobView:

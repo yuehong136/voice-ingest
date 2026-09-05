@@ -170,6 +170,11 @@ asyncio.run(main())
 
 提交后立即返回持久化业务任务 ID，无需客户端支持 MCP Tasks，也无需保持 MCP 连接。转写读取支持分页与时间范围，避免一次响应塞入整段长录音。
 
+`submit_transcription` 只需提供 `asset_id`。MCP 自动按文件及规范化后的转写参数去重，
+重连后或任务完成后重复调用也返回同一任务，无需在 Agent 提示词中管理幂等键。
+可选的 `idempotency_key` 用于明确发起一次新的识别，同一次请求重试时复用；
+失败任务使用 `retry_transcription`。HTTP/SDK 的幂等契约保持不变。
+
 ### 让 Agent 上传本地文件
 
 执行 `uv sync --all-extras --frozen` 后，在支持 `mcpServers` 配置的客户端中添加本地 stdio 桥接器：

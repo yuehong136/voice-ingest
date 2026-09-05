@@ -170,6 +170,11 @@ Use `http://localhost:18080/mcp/` with `Authorization: Bearer YOUR_VOICE_INGEST_
 
 Submissions return durable business job IDs immediately. MCP Tasks support and a persistent MCP connection are not required. Transcript reads support pagination and time ranges to keep long recordings out of a single tool response.
 
+`submit_transcription` only requires `asset_id`. MCP automatically deduplicates the same asset and
+normalized options across reconnections, including completed jobs. An optional explicit
+`idempotency_key` supports intentional new recognition; reuse it for retries of that request.
+Use `retry_transcription` to retry a failed job. HTTP/SDK idempotency contracts are unchanged.
+
 ### Upload local files from an agent
 
 After `uv sync --all-extras --frozen`, configure a local stdio bridge in a client that supports `mcpServers` configuration:

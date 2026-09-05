@@ -4,6 +4,7 @@ import httpx
 import pytest
 from conftest import upload_transport
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 from test_jobs import finish
 
 from voice_ingest.client import AsyncVoiceClient
@@ -113,3 +114,49 @@ async def test_sdk_changed_file_gets_new_asset(env, tmp_path):
         file.write_bytes(b"two")
         second = await sdk.upload(file, state_dir=tmp_path / "cache")
         assert first.id != second.id
+
+
+async def test_mcp_default_submission_survives_reconnect_and_local_bridge(env, asset, tmp_path):
+    from voice_ingest.interfaces.local_mcp import create_local_mcp
+    from voice_ingest.transcription.contracts import TranscriptionOptions
+
+    async with Client(create_mcp(env.transcriptions)) as remote:
+        tool = next(t for t in await remote.list_tools() if t.name == "submit_transcription")
+        assert tool.input_schema["required"] == ["asset_id"]
+        first = await remote.call_tool("submit_transcription", {"asset_id": asset})
+        job_id = first.structured_content["id"]
+    await finish(env, job_id)
+    async with Client(create_mcp(env.transcriptions)) as remote:
+        repeated = await remote.call_tool(
+            "submit_transcription",
+            {"asset_id": asset, "options": TranscriptionOptions().model_dump()},
+        )
+        assert repeated.structured_content["id"] == job_id
+        assert repeated.structured_content["state"] == "succeeded"
+        changed = await remote.call_tool(
+            "submit_transcription", {"asset_id": asset, "options": {"language_hints": ["en"]}}
+        )
+        assert changed.structured_content["id"] != job_id
+
+    sdk = AsyncVoiceClient(
+        "http://test", "test-api-key", transport=httpx.ASGITransport(create_app(env.settings, env))
+    )
+    async with Client(create_local_mcp(sdk, [tmp_path])) as local:
+        repeated = await local.call_tool("submit_transcription", {"asset_id": asset})
+        assert repeated.structured_content["id"] == job_id
+
+
+async def test_mcp_explicit_keys_retain_conflicts_and_reject_empty_keys(env, asset):
+    async with Client(create_mcp(env.transcriptions)) as mcp:
+        args = {"asset_id": asset, "idempotency_key": "intentional-new-recognition"}
+        first = await mcp.call_tool("submit_transcription", args)
+        repeated = await mcp.call_tool("submit_transcription", args)
+        assert first.structured_content["id"] == repeated.structured_content["id"]
+        automatic = await mcp.call_tool("submit_transcription", {"asset_id": asset})
+        assert automatic.structured_content["id"] != first.structured_content["id"]
+        with pytest.raises(ToolError, match="different parameters"):
+            await mcp.call_tool(
+                "submit_transcription", {**args, "options": {"language_hints": ["en"]}}
+            )
+        with pytest.raises(ToolError):
+            await mcp.call_tool("submit_transcription", {**args, "idempotency_key": ""})

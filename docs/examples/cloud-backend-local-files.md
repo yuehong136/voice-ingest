@@ -97,13 +97,16 @@ The expected tool sequence is:
 | --- | --- | --- |
 | `list_models` | `{}` | Configured model capabilities |
 | `upload_local_audio` | `{"path":"/Users/alex/Recordings/meeting.mp4"}` | An asset whose `id` is the `asset_id` |
-| `submit_transcription` | `{"asset_id":"ASSET_ID","idempotency_key":"UNIQUE_KEY_FOR_THIS_REQUEST"}` | A job whose `id` is the `job_id` |
+| `submit_transcription` | `{"asset_id":"ASSET_ID"}` | A job whose `id` is the `job_id` |
 | `get_transcription` | `{"job_id":"JOB_ID"}` | Current durable status |
 | `read_transcript` | `{"job_id":"JOB_ID","limit":50}` | A page of segments; follow `next_cursor` |
 | `export_transcript` | `{"job_id":"JOB_ID","format":"markdown"}` | An authenticated API download path |
 
 Use returned IDs rather than these placeholders. Read and export after `succeeded`; use `srt` for the
-second export. Reuse the submission's idempotency key if its network response is lost. Uploading alone
+second export. MCP generates a stable key from the asset and normalized options when the optional
+`idempotency_key` is omitted. Repeating the call after a lost response or reconnect returns the same
+job, including completed jobs. Changed options create a different job; use an explicit fresh key only
+for intentional new recognition with identical options, and reuse that key for network retries. Uploading alone
 does not start recognition; submitting to a real provider may incur charges.
 
 ## Case B: browser upload, remote agent follow-up
