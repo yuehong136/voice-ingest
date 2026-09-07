@@ -77,6 +77,13 @@ npm test
 
 Browser tests default to installed Google Chrome. On CI, install it with `npx playwright install --with-deps chrome`, or configure `PLAYWRIGHT_CHANNEL` for a supported installed channel. Tests cover sample interactions, mobile overflow, auth errors, upload headers, idempotency and uncertain retry acknowledgement. Tracing is disabled to avoid capturing credentials or transcripts.
 
+`npm test` builds and starts its own production preview on `127.0.0.1:5174` via
+`npm run test:serve`. Stop any frontend dev server on that port before testing.
+Existing servers are never reused, so both local and CI tests exercise the current
+production bundle without development hot reloads. Successful-login helpers wait
+for the authenticated workspace and enabled upload action before continuing;
+authentication-error tests only submit the login form.
+
 API types are generated from FastAPI's OpenAPI schema without connecting to services. For regeneration, install Python server dependencies from the project root, then run:
 
 ```sh

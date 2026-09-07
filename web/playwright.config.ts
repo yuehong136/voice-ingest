@@ -12,8 +12,8 @@ export default defineConfig({
     channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run test:serve',
     url: 'http://127.0.0.1:5174',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 })

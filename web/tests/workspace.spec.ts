@@ -16,13 +16,23 @@ const job = {
   attempt: 1,
   remote_may_run: false,
 }
-async function connect(page: Page) {
+async function submitConnection(page: Page) {
   await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
   await page.getByLabel('Workspace access key').fill('browser-test-key')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: 'Connect workspace', exact: true })
     .click()
+}
+async function connect(page: Page) {
+  await submitConnection(page)
+  await expect(
+    page.getByRole('dialog', { name: 'Connect your workspace', exact: true }),
+  ).toHaveCount(0)
+  await expect(page.locator('.connection-pill')).toHaveText('Connected')
+  await expect(
+    page.getByRole('button', { name: 'New transcription', exact: true }).first(),
+  ).toBeEnabled()
 }
 test('demo supports search, exports, language switching and narrow screens', async ({ page }) => {
   await page.goto('/')
@@ -56,7 +66,7 @@ test('auth errors are visible and service keys never persist', async ({ page }) 
     }),
   )
   await page.goto('/')
-  await connect(page)
+  await submitConnection(page)
   await expect(page.getByRole('alert')).toContainText('Workspace access key is incorrect')
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('browser-test-key')
 })

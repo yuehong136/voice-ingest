@@ -13,6 +13,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "screenshots": "npm run build && node scripts/screenshots.mjs",
     "test": "playwright test",
+    "test:serve": "npm run build && vite preview --host 127.0.0.1 --port 5174 --strictPort",
     "types:generate": "../.venv/bin/python scripts/openapi.py && tools/node_modules/.bin/openapi-typescript .openapi.json -o src/schema.d.ts",
     "format": "prettier --write .",
     "check": "prettier --check . && tsc -b"
