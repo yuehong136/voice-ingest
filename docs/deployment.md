@@ -20,7 +20,7 @@ cp .env.example .env
 docker compose --env-file .env -f deploy/compose.yaml config --quiet
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
 docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api worker
-curl http://127.0.0.1:18080/health/ready
+curl http://127.0.0.1:18080/v1/health/ready
 ```
 
 Choose a database password without URL-reserved characters in the sample Compose URL, or supply an
@@ -87,8 +87,8 @@ for cloud processing. Mock results are explicitly marked synthetic and never est
   until terminal; do not delete their audio while the provider may still read it.
 - `upload_busy`: another completion is in progress. After a crashed API, wait up to five minutes and
   resume the same upload. Unfinished uploads are cleaned after 24 hours.
-- `/health/live` checks the process; `/health/ready` checks schema/database and bucket reachability.
-  Authenticated `/metrics` exposes current state/error counts, oldest active job age and recent worker
+- `/v1/health/live` checks the process; `/v1/health/ready` checks schema/database and bucket reachability.
+  Authenticated `/v1/metrics` exposes current state/error counts, oldest active job age and recent worker
   heartbeats. Alert on missing workers, increasing queue age and result download failures.
 - `jobs delete` removes all result objects for a job and retains a minimal job/idempotency tombstone;
   `assets delete` removes source audio when it is not in use. Completed files do not expire implicitly.

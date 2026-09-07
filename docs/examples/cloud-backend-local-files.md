@@ -26,7 +26,7 @@ file or implement an upload integration. Voice Ingest currently has no chat-spec
 
 The operator deploys the API, worker, PostgreSQL and private S3 storage using the
 [deployment guide](../deployment.md). In this example, `https://voice.example.com` is a placeholder
-for the **API base URL**, and its remote MCP endpoint is `/mcp/`. If your frontend proxies the API
+for the **API base URL**, and its remote MCP endpoint is `/v1/mcp/`. If your frontend proxies the API
 under `/api`, use the externally routed API base URL instead of assuming the frontend origin is the API.
 
 - Configure the provider key on the backend. Give clients a **Voice Ingest workspace key** through their secret settings.
@@ -113,7 +113,7 @@ does not start recognition; submitting to a real provider may incur charges.
 
 1. Open the deployed web workspace and connect with the workspace key.
 2. Upload the recording and submit transcription there.
-3. Configure your hosted agent's HTTP MCP connection with `https://voice.example.com/mcp/` and the header `Authorization: Bearer YOUR_WORKSPACE_API_KEY`.
+3. Configure your hosted agent's HTTP MCP connection with `https://voice.example.com/v1/mcp/` and the header `Authorization: Bearer YOUR_WORKSPACE_API_KEY`.
 4. Ask the agent to use `list_transcriptions` to find the existing job, then inspect it with `get_transcription`. If several jobs match, identify the intended job before proceeding.
 
 > Find my recently submitted transcription. Show its status and job ID. Once it succeeds,

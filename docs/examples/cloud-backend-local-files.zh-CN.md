@@ -24,7 +24,7 @@ Agent 使用 MCP 协调任务，文件通过 HTTP/S3 上传。拿到持久化任
 ## 开始之前
 
 管理员按照[部署指南](../deployment.md)部署 API、worker、PostgreSQL 和私有 S3。
-本案例中的 `https://voice.example.com` 是 **API 基础地址占位符**，远程 MCP 位于 `/mcp/`。
+本案例中的 `https://voice.example.com` 是 **API 基础地址占位符**，远程 MCP 位于 `/v1/mcp/`。
 如果前端通过 `/api` 代理后端，请使用实际对外路由的 API 基础地址，不要默认网页域名就是 API 地址。
 
 - 阿里密钥配置在后端；客户端通过自己的密钥配置功能保存 **Voice Ingest 工作区访问密钥**。
@@ -108,7 +108,7 @@ sequenceDiagram
 
 1. 打开部署后的网页工作区，使用工作区访问密钥连接。
 2. 在网页上传录音并提交转写。
-3. 在云端 Agent 中配置 HTTP MCP：地址 `https://voice.example.com/mcp/`，请求头 `Authorization: Bearer YOUR_WORKSPACE_API_KEY`。
+3. 在云端 Agent 中配置 HTTP MCP：地址 `https://voice.example.com/v1/mcp/`，请求头 `Authorization: Bearer YOUR_WORKSPACE_API_KEY`。
 4. 让 Agent 使用 `list_transcriptions` 查找已有任务，再用 `get_transcription` 查询；若存在多个候选任务，先确认目标任务。
 
 > 找到我刚提交的转写任务，告诉我状态和任务 ID。成功后读取前五分钟的文字，

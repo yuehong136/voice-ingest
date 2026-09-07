@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     s3_access_key: SecretStr = SecretStr("")
     s3_secret_key: SecretStr = SecretStr("")
     provider: Literal["mock", "aliyun"] = "mock"
+    deployments_file: str | None = None
     aliyun_region: Literal["beijing", "singapore"] = "beijing"
     aliyun_workspace_id: str | None = None
     aliyun_api_key: SecretStr = SecretStr("")
@@ -69,3 +70,9 @@ class Settings(BaseSettings):
             return f"https://{self.aliyun_workspace_id}.{region}.maas.aliyuncs.com/api/v1"
         host = "dashscope" if self.aliyun_region == "beijing" else "dashscope-intl"
         return f"https://{host}.aliyuncs.com/api/v1"
+
+    @property
+    def aliyun_websocket_url(self) -> str:
+        return self.aliyun_base_url.replace("https://", "wss://").replace(
+            "/api/v1", "/api-ws/v1/inference"
+        )

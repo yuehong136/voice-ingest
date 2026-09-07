@@ -1,6 +1,6 @@
 # Voice Ingest Web
 
-An English/Chinese transcription workspace for the existing API. The entry screen connects to your real workspace; synthetic sample transcripts are available through an explicit preview action.
+An English/Chinese transcription and complete-file synthesis workspace for the v1 API. The entry screen connects to your real workspace; synthetic sample transcripts are available through an explicit preview action.
 
 ## Run locally
 
@@ -100,3 +100,5 @@ Set `VOICE_PROVIDER=aliyun` and the regional `VOICE_ALIYUN_API_KEY` in the backe
 For local evaluation without public storage, also set `VOICE_ALIYUN_SOURCE_MODE=temporary_upload`. The worker stages files through Aliyun’s official temporary upload service; production keeps `signed_url`. See [backend configuration](../docs/deployment.md#real-asr-from-a-local-browser).
 
 Routine Playwright tests remain cloud-free. Real ASR browser acceptance requires explicit authorization and is recorded separately; never point the automatic mock-backend test at a billable provider.
+
+Speech synthesis uses `/v1/models`, `/v1/voices` and `/v1/syntheses`; the backend owns all job transitions. Select Speech synthesis from the sidebar or mobile capability tabs. Mock deployments generate synthetic WAV audio; real Aliyun defaults to MP3 and requires separately authorized paid acceptance.

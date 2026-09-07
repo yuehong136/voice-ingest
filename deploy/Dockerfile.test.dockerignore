@@ -1,0 +1,16 @@
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!alembic.ini
+!src/
+!src/**
+!migrations/
+!migrations/**
+!tests/
+!tests/**
+**/__pycache__
+**/*.wav
+**/*.mp3
+**/.env*

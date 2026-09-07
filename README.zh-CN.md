@@ -58,7 +58,7 @@ npm run dev
 cp .env.example .env
 # 编辑 .env：更换服务 API Key、数据库密码和 S3 凭证。
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
-curl --fail http://127.0.0.1:18080/health/ready
+curl --fail http://127.0.0.1:18080/v1/health/ready
 ```
 
 命令启动独立的 API、worker、PostgreSQL 和 MinIO。默认本地端口为 **18080**（API）和 **19000**（S3），不占用 80/443。
@@ -77,17 +77,24 @@ uv run voice-ingest transcribe meeting.m4a --wait --format markdown
 
 将 `meeting.m4a` 替换为音频路径。`--wait` 轮询任务，成功后输出 Markdown；不加则立即返回任务 ID。中断等待不会取消后端任务。
 
-> **验证状态：** 本地测试及一次真实阿里录音转写已通过。完整 Compose 启动尚未验收，上次镜像构建因依赖下载超时中断。详见[验收记录](docs/acceptance.md)。
+> **验证状态：** 第一阶段检查及本阶段阿里 STT/TTS 真实验收已于 2026-09-07 通过，包括 Worker 重启恢复、跨入口查询、浏览器播放下载及用户试听确认。证据和剩余质量/部署边界见[当前交接](docs/plans/phase-1-aliyun-stt-tts.md)；[历史录音验收](docs/acceptance.md)单独保留。独立验收不代表生产部署已验收。
+
+第一阶段新增**语音合成**工作区：连接后端，选择模型、部署与音色，输入完整文本并明确提交，完成后播放和下载。
+阿里首个配置为 `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3；mock 部署输出 WAV 静音测试音频。
+CLI 使用 `voice-ingest syntheses --help`；SDK 使用 `synthesize()`、`get_synthesis()`、`synthesis_result()` 和 `synthesis_audio()`；
+远程和本地 MCP 提供音色查询及合成生命周期工具，均复用相同业务实现。
+已有数据库必须执行新增 `0002` 迁移，不重建数据库。后续接手请从[阶段文档](docs/plans/phase-1-aliyun-stt-tts.md)进入设计和完整调研。
 
 ## 供应商与模型
 
 | 供应商 / 模型 | 当前能力 | 验证情况 |
 | --- | --- | --- |
 | Mock | 完整上传、任务和导出流程；生成模拟文本 | 离线测试及 PostgreSQL/MinIO 集成测试 |
-| 阿里 `qwen-audio-3.0-asr-flash-filetrans` | 默认整文件异步 ASR | 已完成 87 分钟真实录音转写 |
+| 阿里 `qwen-audio-3.0-asr-flash-filetrans` | 默认整文件异步 ASR | 历史 87 分钟录音；本阶段短样本重启恢复与导出验收通过 |
+| 阿里 `qwen-audio-3.0-tts-flash` | 完整文本合成、`longanhuan_v3.6`、MP3 | 真实合成、浏览器播放下载与用户试听确认通过 |
 | 阿里 `fun-asr` | 显式选择模型 | 已有适配器契约测试，尚未真实调用验收 |
 
-当前模型校验上限为 **12 小时 / 2 GB**；开启说话人分离时，超过两小时会拒绝。语言提示、说话人分离和上下文支持随模型而异，可通过 `voice-ingest models` 或 `/v1/models` 查询。整文件提交，不自动压缩或做 VAD 切片。
+当前 STT 模型校验上限为 **12 小时 / 2 GB**；开启说话人分离时，超过两小时会拒绝。语言提示、说话人分离和上下文支持随模型而异，可通过 `voice-ingest models` 或 `/v1/models` 查询。整文件提交，不自动压缩或做 VAD 切片。
 
 启用阿里时，编辑 `.env`，并重新创建 API 和 worker：
 
@@ -209,7 +216,7 @@ flowchart LR
 
 ### 连接远程客户端
 
-端点为 `http://localhost:18080/mcp/`，请求头为 `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`。在客户端的 HTTP MCP 配置中填入地址与请求头。
+端点为 `http://localhost:18080/v1/mcp/`，请求头为 `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`。在客户端的 HTTP MCP 配置中填入地址与请求头。
 
 | 操作 | 工具 |
 | --- | --- |
@@ -266,10 +273,10 @@ flowchart LR
 
 ```bash
 curl -H "Authorization: Bearer $VOICE_API_KEY" \
-  "$VOICE_URL/openapi.json" -o openapi.json
+  "$VOICE_URL/v1/openapi.json" -o openapi.json
 ```
 
-`/docs` 同样需要鉴权。`/health/live` 和 `/health/ready` 是公开的进程与就绪检查；`/metrics` 需要服务密钥。
+`/v1/docs` 同样需要鉴权。`/v1/health/live` 和 `/v1/health/ready` 是公开的进程与就绪检查；`/v1/metrics` 需要服务密钥。
 
 ## 工作方式
 
@@ -309,7 +316,7 @@ uv build
 
 ## 范围与文档
 
-当前版本聚焦共享可信工作区中的离线 ASR，尚未实现实时识别、TTS、多租户或知识库自动入库。TTS 是后续方向，暂无承诺的发布日期。
+当前版本聚焦共享可信工作区中的文件转写与完整文本合成。实时会话、声音克隆、自动长文本分段、多租户、其他厂商和知识库自动入库属于后续范围。
 
 | 文档 | 内容 |
 | --- | --- |

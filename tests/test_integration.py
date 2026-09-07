@@ -14,6 +14,8 @@ from uuid import uuid4
 import httpx
 import pytest
 import uvicorn
+from alembic import command
+from alembic.config import Config
 from fastmcp import Client
 from pydantic import SecretStr
 from sqlalchemy import text, update
@@ -26,12 +28,20 @@ from voice_ingest.media.probe import MediaProbe
 from voice_ingest.media.service import UploadService
 from voice_ingest.media.storage import S3Storage
 from voice_ingest.providers.mock import MockProvider
-from voice_ingest.runtime.database import Asset, Base, Job, SchedulerLock, now, uid
+from voice_ingest.runtime.database import Asset, Job, now, uid
+from voice_ingest.runtime.deployments import create_registry
 from voice_ingest.runtime.settings import Settings
+from voice_ingest.synthesis.service import SynthesisService
 from voice_ingest.transcription.contracts import CreateTranscription
 from voice_ingest.transcription.service import TranscriptionService
 
 pytestmark = pytest.mark.integration
+
+
+def migrate_schema(connection, revision="head"):
+    config = Config("alembic.ini")
+    config.attributes["connection"] = connection
+    command.upgrade(config, revision)
 
 
 @pytest.fixture
@@ -64,10 +74,9 @@ async def real_env():
     storage = S3Storage(settings)
     storage.internal.create_bucket(Bucket=storage.bucket)
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    async with sessions.begin() as session:
-        session.add(SchedulerLock(id=1))
+        await connection.run_sync(migrate_schema)
     provider = MockProvider()
+    registry = create_registry(settings, storage, provider)
     probe = MediaProbe(storage, settings.ffprobe_binary)
     env = SimpleNamespace(
         settings=settings,
@@ -75,10 +84,11 @@ async def real_env():
         sessions=sessions,
         storage=storage,
         provider=provider,
-        transcriptions=TranscriptionService(sessions, storage, settings),
+        transcriptions=TranscriptionService(sessions, storage, settings, registry),
         uploads=UploadService(sessions, storage),
     )
-    env.worker = Worker(sessions, storage, provider, probe, settings)
+    env.worker = Worker(sessions, storage, registry, probe, settings)
+    env.syntheses = SynthesisService(sessions, storage, settings, env.worker.registry)
     try:
         yield env
     finally:
@@ -141,7 +151,7 @@ async def test_postgres_concurrent_claim_fencing_and_idempotency(real_env):
     for i in range(4):
         await env.transcriptions.create(request, f"different-{i}")
     workers = [
-        Worker(env.sessions, env.storage, env.provider, env.worker.probe, env.settings)
+        Worker(env.sessions, env.storage, env.worker.registry, env.worker.probe, env.settings)
         for _ in range(6)
     ]
     claims = await asyncio.gather(*(worker.claim() for worker in workers))
@@ -196,7 +206,11 @@ async def test_real_upload_probe_worker_and_http_mcp(real_env, tmp_path, seconds
             await env.worker.tick()
             assert (await sdk.get(job.id)).state == "running"
             env.worker = Worker(
-                env.sessions, env.storage, MockProvider(), env.worker.probe, env.settings
+                env.sessions,
+                env.storage,
+                create_registry(env.settings, env.storage, MockProvider()),
+                env.worker.probe,
+                env.settings,
             )
             await finish(env, job.id)
             result = await sdk.result(job.id)
@@ -204,10 +218,38 @@ async def test_real_upload_probe_worker_and_http_mcp(real_env, tmp_path, seconds
             assert result.segments[-1].end_ms == seconds * 1000
             assert (await sdk.asset(asset.id)).media_info["sha256_verified"]
             assert b"WEBVTT" in await sdk.export(job.id, "vtt")
-            async with Client(f"http://127.0.0.1:{port}/mcp/", auth="test-api-key") as mcp:
+            async with Client(f"http://127.0.0.1:{port}/v1/mcp/", auth="test-api-key") as mcp:
                 response = await mcp.call_tool("get_transcription", {"job_id": job.id})
                 assert response.structured_content["state"] == "succeeded"
     finally:
         server.should_exit = True
         await serving
         sock.close()
+
+
+async def test_synthesis_real_postgres_s3_and_decoder(real_env):
+    from voice_ingest.synthesis.contracts import CreateSynthesis, SynthesisOptions
+
+    env = real_env
+    created = await env.syntheses.create(
+        CreateSynthesis(
+            text="synthetic integration fixture",
+            options=SynthesisOptions(model="mock-tts", voice="mock-voice", format="wav"),
+        ),
+        "tts-integration",
+    )
+    await env.worker.tick()
+    env.worker = Worker(
+        env.sessions,
+        env.storage,
+        create_registry(env.settings, env.storage, MockProvider()),
+        env.worker.probe,
+        env.settings,
+    )
+    await env.worker.tick()
+    assert (await env.syntheses.get(created.id)).state == "succeeded"
+    metadata = await env.syntheses.result(created.id)
+    audio = await env.syntheses.audio(created.id)
+    assert metadata.duration_ms == 1000
+    assert metadata.size == len(audio)
+    assert metadata.sha256 == hashlib.sha256(audio).hexdigest()

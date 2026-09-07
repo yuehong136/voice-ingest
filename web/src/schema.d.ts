@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/health/live": {
+    "/v1/health/live": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Live */
-        get: operations["live_health_live_get"];
+        get: operations["live_v1_health_live_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/health/ready": {
+    "/v1/health/ready": {
         parameters: {
             query?: never;
             header?: never;
@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** Ready */
-        get: operations["ready_health_ready_get"];
+        get: operations["ready_v1_health_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -38,7 +38,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/metrics": {
+    "/v1/metrics": {
         parameters: {
             query?: never;
             header?: never;
@@ -46,7 +46,7 @@ export interface paths {
             cookie?: never;
         };
         /** Metrics */
-        get: operations["metrics_metrics_get"];
+        get: operations["metrics_v1_metrics_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -280,6 +280,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/voices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Voices */
+        get: operations["voices_v1_voices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Syntheses */
+        get: operations["list_syntheses_v1_syntheses_get"];
+        put?: never;
+        /** Create Synthesis */
+        post: operations["create_synthesis_v1_syntheses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Synthesis */
+        get: operations["get_synthesis_v1_syntheses__job_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Synthesis */
+        delete: operations["delete_synthesis_v1_syntheses__job_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Synthesis */
+        post: operations["cancel_synthesis_v1_syntheses__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Synthesis */
+        post: operations["retry_synthesis_v1_syntheses__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses/{job_id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Synthesis Result */
+        get: operations["synthesis_result_v1_syntheses__job_id__result_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/syntheses/{job_id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Synthesis Audio */
+        get: operations["synthesis_audio_v1_syntheses__job_id__audio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -298,6 +419,12 @@ export interface components {
             media_info?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** CreateSynthesis */
+        CreateSynthesis: {
+            /** Text */
+            text: string;
+            options?: components["schemas"]["SynthesisOptions"];
         };
         /** CreateTranscription */
         CreateTranscription: {
@@ -349,6 +476,17 @@ export interface components {
         JobView: {
             /** Id */
             id: string;
+            /**
+             * Kind
+             * @default transcription
+             * @constant
+             */
+            kind: "transcription";
+            /**
+             * Deployment Id
+             * @default default
+             */
+            deployment_id: string;
             /** Asset Id */
             asset_id: string;
             state: components["schemas"]["JobState"];
@@ -378,6 +516,40 @@ export interface components {
             id: string;
             /** Provider */
             provider: string;
+            /**
+             * Kind
+             * @default transcription
+             * @enum {string}
+             */
+            kind: "transcription" | "synthesis";
+            /**
+             * Deployment Id
+             * @default default
+             */
+            deployment_id: string;
+            /**
+             * Deployment Revision
+             * @default 1
+             */
+            deployment_revision: string;
+            /**
+             * Location
+             * @default cloud
+             * @enum {string}
+             */
+            location: "cloud" | "local" | "test";
+            /**
+             * Execution
+             * @default remote_task
+             * @enum {string}
+             */
+            execution: "remote_task" | "direct" | "audio_stream";
+            /** Formats */
+            formats?: string[];
+            /** Sample Rates */
+            sample_rates?: number[];
+            /** Max Text Characters */
+            max_text_characters?: number | null;
             /**
              * Max Bytes
              * @default 2000000000
@@ -439,6 +611,126 @@ export interface components {
             /** Expires In */
             expires_in: number;
         };
+        /** SynthesisJob */
+        SynthesisJob: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @default synthesis
+             * @constant
+             */
+            kind: "synthesis";
+            state: components["schemas"]["JobState"];
+            options: components["schemas"]["SynthesisOptions"];
+            /** Deployment Id */
+            deployment_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Attempt */
+            attempt: number;
+            error?: components["schemas"]["ErrorInfo"] | null;
+            /**
+             * Remote May Run
+             * @default false
+             */
+            remote_may_run: boolean;
+        };
+        /** SynthesisOptions */
+        SynthesisOptions: {
+            /**
+             * Model
+             * @default qwen-audio-3.0-tts-flash
+             */
+            model: string;
+            /** Deployment Id */
+            deployment_id?: string | null;
+            /**
+             * Routing
+             * @default any
+             * @enum {string}
+             */
+            routing: "any" | "local_only";
+            /**
+             * Voice
+             * @default longanhuan_v3.6
+             */
+            voice: string;
+            /**
+             * Format
+             * @default mp3
+             * @enum {string}
+             */
+            format: "mp3" | "wav";
+            /**
+             * Sample Rate
+             * @default 22050
+             */
+            sample_rate: number;
+        };
+        /** SynthesisPage */
+        SynthesisPage: {
+            /** Items */
+            items: components["schemas"]["SynthesisJob"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** SynthesisResult */
+        SynthesisResult: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: "1";
+            /** Job Id */
+            job_id: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Deployment Id */
+            deployment_id: string;
+            /** Deployment Revision */
+            deployment_revision: string;
+            /** Voice */
+            voice: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "mp3" | "wav";
+            /** Content Type */
+            content_type: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Sample Rate */
+            sample_rate: number;
+            /** Request Id */
+            request_id?: string | null;
+            /** Input Characters */
+            input_characters: number;
+            /**
+             * Usage Source
+             * @default measured_input
+             * @constant
+             */
+            usage_source: "measured_input";
+            /** Audio Path */
+            audio_path: string;
+        };
         /** Transcript */
         Transcript: {
             /**
@@ -484,6 +776,14 @@ export interface components {
              * @default qwen-audio-3.0-asr-flash-filetrans
              */
             model: string;
+            /** Deployment Id */
+            deployment_id?: string | null;
+            /**
+             * Routing
+             * @default any
+             * @enum {string}
+             */
+            routing: "any" | "local_only";
             /** Language Hints */
             language_hints?: string[];
             /**
@@ -545,6 +845,17 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** Voice */
+        Voice: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Model */
+            model: string;
+            /** Deployment Id */
+            deployment_id: string;
+        };
         /** Word */
         Word: {
             /** Text */
@@ -563,7 +874,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    live_health_live_get: {
+    live_v1_health_live_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -583,7 +894,7 @@ export interface operations {
             };
         };
     };
-    ready_health_ready_get: {
+    ready_v1_health_ready_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -603,7 +914,7 @@ export interface operations {
             };
         };
     };
-    metrics_metrics_get: {
+    metrics_v1_metrics_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -841,7 +1152,9 @@ export interface operations {
     };
     models_v1_models_get: {
         parameters: {
-            query?: never;
+            query?: {
+                capability?: ("transcription" | "synthesis") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -855,6 +1168,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelCapability"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1126,6 +1448,293 @@ export interface operations {
             path: {
                 job_id: string;
                 format: "json" | "txt" | "markdown" | "srt" | "vtt";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voices_v1_voices_get: {
+        parameters: {
+            query: {
+                model: string;
+                deployment_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Voice"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_syntheses_v1_syntheses_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_synthesis_v1_syntheses_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSynthesis"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_synthesis_v1_syntheses__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_synthesis_v1_syntheses__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_synthesis_v1_syntheses__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_synthesis_v1_syntheses__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    synthesis_result_v1_syntheses__job_id__result_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynthesisResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    synthesis_audio_v1_syntheses__job_id__audio_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
             };
             cookie?: never;
         };

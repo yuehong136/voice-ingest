@@ -1,0 +1,12 @@
+FROM python:3.13.11-slim-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv==0.12.3
+WORKDIR /app
+COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY src ./src
+RUN uv sync --frozen --all-extras
+COPY migrations ./migrations
+COPY alembic.ini ./
+COPY tests ./tests
+CMD ["uv", "run", "pytest", "-q"]

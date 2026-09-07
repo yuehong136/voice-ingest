@@ -1,6 +1,8 @@
 """S3 calls are bounded and run outside the event loop; signing uses the public origin."""
 
 import asyncio
+import base64
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,18 @@ from botocore.exceptions import BotoCoreError, ClientError
 from voice_ingest.media.contracts import UploadedPart
 from voice_ingest.runtime.settings import Settings
 from voice_ingest.transcription.contracts import DomainError
+
+
+def delete_objects_md5(params, **kwargs):
+    # S3 Multi-Object Delete requires Content-MD5 on compatible general-purpose stores.
+    # Recent botocore defaults to flexible CRC checksums, which older stores reject.
+    # Compute over the serialized XML before signing; keep the SDK checksum as well.
+    body = params["body"]
+    if not isinstance(body, bytes):
+        raise ValueError("DeleteObjects requires a serialized byte body")
+    params["headers"].setdefault(
+        "Content-MD5", base64.b64encode(hashlib.md5(body, usedforsecurity=False).digest()).decode()
+    )
 
 
 class S3Storage:
@@ -33,6 +47,7 @@ class S3Storage:
             ),
         )
         self.internal = boto3.client("s3", endpoint_url=settings.s3_endpoint, **kwargs)
+        self.internal.meta.events.register("before-call.s3.DeleteObjects", delete_objects_md5)
         self.public = boto3.client("s3", endpoint_url=settings.s3_public_endpoint, **kwargs)
 
     async def _call(self, operation: str, **kwargs: Any) -> Any:
@@ -132,13 +147,16 @@ class S3Storage:
         await self._call("put_object", Key=key, Body=body, ContentType=content_type)
 
     async def read_json(self, key: str) -> dict[str, Any]:
+        return json.loads(await self.read_bytes(key, 32 * 1024 * 1024))
+
+    async def read_bytes(self, key: str, limit: int) -> bytes:
         response = await self._call("get_object", Key=key)
         body = response["Body"]
         try:
-            content = await asyncio.to_thread(body.read, 32 * 1024 * 1024 + 1)
-            if len(content) > 32 * 1024 * 1024:
-                raise DomainError("result_too_large", "Result exceeds the 32 MiB limit")
-            return json.loads(content)
+            content = await asyncio.to_thread(body.read, limit + 1)
+            if len(content) > limit:
+                raise DomainError("result_too_large", "Result exceeds the size limit")
+            return content
         finally:
             body.close()
 

@@ -1,8 +1,14 @@
 # Architecture
 
-Voice Ingest is a modular Python service for offline audio transcription. HTTP, remote MCP, CLI and
-the Python SDK share the same durable jobs. There is no RAG indexing, real-time stream, TTS or tenant
-system in this release. All API keys access one trusted workspace.
+Voice Ingest is a modular Python service for file transcription and complete-file speech synthesis.
+HTTP, remote MCP, CLI, local MCP and the Python SDK share durable PostgreSQL jobs. Application APIs
+use `/v1` only. Phase 1 implements Aliyun STT/TTS; no RAG indexing, realtime sessions, voice cloning,
+automatic text splitting or tenant system is included. All API keys access one trusted workspace.
+
+Read the [v1 design](design/voice-platform-v1.md), [phase acceptance and handoff](plans/phase-1-aliyun-stt-tts.md)
+and task-relevant [open-source research](references/voice-ai-open-source-research.md). These repository
+documents remain authoritative without the personal skill. Implementation is not proof of paid
+vendor acceptance; consult the phase evidence table for what has actually passed.
 
 ## Boundaries
 
@@ -13,20 +19,22 @@ flowchart LR
   SDK --> API[HTTP API]
   SDK -->|signed multipart PUT| S3[Private S3 bucket]
   Agent[Remote MCP client] --> MCP[FastMCP HTTP]
-  API --> Usecases[Media and transcription use cases]
+  API --> Usecases[Media, transcription and synthesis use cases]
   MCP --> Usecases
   Usecases --> PG[(PostgreSQL)]
   Worker[Worker] --> PG
   Worker --> S3
-  Worker --> ASR[Aliyun asynchronous ASR]
-  ASR -->|temporary GET URL| S3
+  Worker --> Registry[Deployment registry]
+  Registry --> ASR[Aliyun asynchronous STT]
+  Registry --> TTS[Aliyun TTS stream to complete file]
+  ASR -->|temporary GET URL or staged source| S3
 ```
 
 Capability packages own their public contracts and behavior. `transcription/contracts.py` and
 `media/contracts.py` are importable without server dependencies. `interfaces` translates protocols;
 it never owns a second workflow. `runtime` composes dependencies. The CLI and local MCP reuse the
-network SDK. A future TTS capability can reuse jobs and storage infrastructure after its own input,
-result and provider contracts are defined; no speculative TTS endpoints are included now.
+network SDK. Synthesis owns separate input/result contracts and reuses the shared jobs lifecycle.
+Common job state and error contracts live in `jobs/contracts.py`.
 
 ## Upload consistency
 
@@ -67,8 +75,9 @@ generation. Result writes use generation-specific object keys, so stale workers 
 new worker's committed result. Failed-generation objects remain private and are removed by explicit
 job-result deletion. Persisted pointers, not a guessed object name, select the authoritative result.
 
-`submitting` is committed **before** sending the provider request. A crash or unknown network outcome
-here becomes `needs_attention`. It is never automatically resubmitted. This service guarantees local
+`submitting` is committed **before** sending the provider request. A crash recovers a durable accepted
+or completed receipt if present; without one it becomes `needs_attention`. It is never automatically
+resubmitted. This service guarantees local
 request idempotency, not exactly-once provider billing. Explicit acknowledgement is required to create
 a new attempt when the prior request may have run. Provider task IDs and attempts are retained.
 
@@ -102,6 +111,32 @@ credentials and signed URLs are not emitted in application logs. Raw provider JS
 are confidential storage/DB records accessible only to operators of this trusted-workspace service.
 
 ## Operations and evolution
+
+`providers/speech.py` is the generic execution boundary (`Accepted` versus `Completed`).
+Provider adapters validate and normalize their own schemas. `runtime/deployments.py` registers
+adapters and builds one or more deployments; `VOICE_DEPLOYMENTS_FILE` optionally selects a strict JSON
+configuration using credential environment-variable references. Existing single-provider environment
+configuration creates deployment `default`. Multiple matches require explicit `deployment_id`;
+`routing=local_only` excludes both cloud and test deployments. Test adapters never join real catalogs.
+Capacity is reserved per deployment. Each Attempt snapshots deployment revision/fingerprint, source
+mode, endpoint, model and effective options; changes require retaining/restoring the original config.
+
+Migration `0002` adds job kind, nullable asset reference, synthesis input and artifact pointers plus
+Attempt deployment/receipt fields. It retains old rows and migration `0001` unchanged. Historical
+attempts can be pinned only when their recorded provider, region, endpoint and source mode match;
+otherwise recovery stops. An automated destructive downgrade is intentionally unavailable.
+
+TTS uses the Aliyun duplex WebSocket protocol internally, but accepts only complete text and publishes
+only complete files. The adapter requires matching task-started/task-finished events and bounded
+audio. Raw events, response identifiers and output audio stay private. Manifest hashes allow receipt
+recovery when complete object writes succeeded but the final marker or database checkpoint failed.
+Normalization or media validation failures resume persisted output, never another inference.
+Output publication verifies the stored content hash, positive duration and format using ffprobe.
+This is media validation plus protocol completion, not a speech-quality guarantee.
+
+Synthesis results expose `/v1/syntheses/{id}/audio`, authenticated on every download. No signed URL is
+returned in public metadata. The first Aliyun preset is qwen-audio-3.0-tts-flash / longanhuan_v3.6 /
+MP3 at 22050 Hz. Mock uses mock-tts / mock-voice / WAV and is explicitly synthetic.
 
 The API, worker, PostgreSQL and S3 are separate containers in one Compose project. No Redis, task
 broker, workflow engine or Kubernetes is required. Add workers for independent I/O, respecting the

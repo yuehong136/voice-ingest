@@ -1,0 +1,20 @@
+[
+  {
+    "id": "aliyun-primary",
+    "revision": "1",
+    "adapter": "aliyun",
+    "region": "beijing",
+    "credential_env": "VOICE_ALIYUN_PRIMARY_KEY",
+    "source_mode": "signed_url",
+    "max_inflight": 2
+  },
+  {
+    "id": "aliyun-secondary",
+    "revision": "1",
+    "adapter": "aliyun",
+    "region": "beijing",
+    "credential_env": "VOICE_ALIYUN_SECONDARY_KEY",
+    "source_mode": "signed_url",
+    "max_inflight": 1
+  }
+]

@@ -4,7 +4,17 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
@@ -61,7 +71,12 @@ class Upload(Base):
 class Job(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
+    asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32), default="transcription")
+    deployment_id: Mapped[str] = mapped_column(String(100), default="default")
+    input: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    capture_key: Mapped[str | None] = mapped_column(String(512))
+    audio_key: Mapped[str | None] = mapped_column(String(512))
     state: Mapped[str] = mapped_column(String(32), default="queued")
     options: Mapped[dict[str, Any]] = mapped_column(JSON)
     idempotency_key: Mapped[str] = mapped_column(String(200), unique=True)
@@ -81,7 +96,15 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now)
     attempt_started_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=now)
-    __table_args__ = (Index("jobs_claim", "state", "next_run_at", "lease_until"),)
+    __table_args__ = (
+        Index("jobs_claim", "state", "next_run_at", "lease_until"),
+        Index("jobs_deployment_state", "deployment_id", "state"),
+        CheckConstraint(
+            "(kind = 'transcription' AND asset_id IS NOT NULL) OR "
+            "(kind = 'synthesis' AND asset_id IS NULL)",
+            name="jobs_capability_asset",
+        ),
+    )
 
 
 class Attempt(Base):
@@ -91,6 +114,8 @@ class Attempt(Base):
     provider: Mapped[str] = mapped_column(String(32))
     region: Mapped[str] = mapped_column(String(32))
     request: Mapped[dict[str, Any]] = mapped_column(JSON)
+    deployment: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    capture_key: Mapped[str | None] = mapped_column(String(512))
     provider_task_id: Mapped[str | None] = mapped_column(String(200))
     raw_key: Mapped[str | None] = mapped_column(String(512))
     result_key: Mapped[str | None] = mapped_column(String(512))
@@ -118,5 +143,5 @@ class WorkerHeartbeat(Base):
 
 
 def database(url: str):
-    engine = create_async_engine(url, pool_pre_ping=True)
+    engine = create_async_engine(url, pool_pre_ping=True, hide_parameters=True)
     return engine, async_sessionmaker(engine, expire_on_commit=False)

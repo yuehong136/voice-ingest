@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from voice_ingest.runtime.database import Base
 
+connection = context.config.attributes.get("connection")
 url = os.environ.get("VOICE_DATABASE_URL")
-if not url:
+if not url and connection is None:
     from dotenv import load_dotenv
 
     load_dotenv()
@@ -27,7 +28,9 @@ async def online():
     await engine.dispose()
 
 
-if context.is_offline_mode():
+if connection is not None:
+    migrate(connection)
+elif context.is_offline_mode():
     context.configure(url=url, target_metadata=Base.metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()

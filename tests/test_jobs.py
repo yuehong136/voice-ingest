@@ -7,6 +7,7 @@ from voice_ingest.jobs.worker import LeaseLost, Worker
 from voice_ingest.providers.base import SubmissionUnknown
 from voice_ingest.providers.mock import MockProvider
 from voice_ingest.runtime.database import Attempt, Job, now
+from voice_ingest.runtime.deployments import create_registry
 from voice_ingest.transcription.contracts import (
     CreateTranscription,
     DomainError,
@@ -41,7 +42,13 @@ async def test_idempotency_and_restart(env, asset):
         )
     await env.worker.tick()
     assert (await env.transcriptions.get(created.id)).state == "running"
-    env.worker = Worker(env.sessions, env.storage, MockProvider(), env.worker.probe, env.settings)
+    env.worker = Worker(
+        env.sessions,
+        env.storage,
+        create_registry(env.settings, env.storage, MockProvider()),
+        env.worker.probe,
+        env.settings,
+    )
     await finish(env, created.id)
     result = await env.transcriptions.result(created.id)
     assert result.duration_ms == 3_600_000
@@ -62,7 +69,7 @@ async def test_unknown_submit_is_not_retried(env, asset):
             raise SubmissionUnknown()
 
     provider = Unknown()
-    env.worker.provider = provider
+    env.worker.registry.deployments["default"].adapter.client = provider
     job = await env.transcriptions.create(CreateTranscription(asset_id=asset), "unknown")
     await env.worker.tick()
     assert (await env.transcriptions.get(job.id)).state == "needs_attention"
@@ -83,7 +90,7 @@ async def test_crash_in_submitting_and_fencing(env, asset):
         await session.execute(
             update(Job).where(Job.id == job.id).values(lease_until=now() - timedelta(seconds=1))
         )
-    other = Worker(env.sessions, env.storage, env.provider, env.worker.probe, env.settings)
+    other = Worker(env.sessions, env.storage, env.worker.registry, env.worker.probe, env.settings)
     recovered = await other.claim()
     assert recovered and recovered.generation > claimed.generation
     with pytest.raises(LeaseLost):
@@ -100,7 +107,7 @@ async def test_cancel_during_submit_preserves_remote_id(env, asset):
             await env.transcriptions.cancel(job.id)
             return await super().submit(*args)
 
-    env.worker.provider = CancelDuringSubmit()
+    env.worker.registry.deployments["default"].adapter.client = CancelDuringSubmit()
     await env.worker.tick()
     async with env.sessions() as session:
         saved = await session.get(Job, job.id)
@@ -140,7 +147,7 @@ async def test_result_retry_does_not_resubmit(env, asset):
             return await super().fetch(*args)
 
     provider = FlakyResult()
-    env.worker.provider = provider
+    env.worker.registry.deployments["default"].adapter.client = provider
     job = await env.transcriptions.create(CreateTranscription(asset_id=asset), "fetch-retry")
     await finish(env, job.id)
     assert provider.submissions == 1 and provider.downloads == 2

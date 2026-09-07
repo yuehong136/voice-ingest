@@ -11,6 +11,31 @@ jobs:
       - run: uv sync --all-extras --frozen
       - run: make check
       - run: uv build
+      - run: uv venv .local/sdk-ci && uv pip install --python .local/sdk-ci/bin/python dist/*.whl
+      - run: .local/sdk-ci/bin/python scripts/check_sdk_install.py
+      - run: uv run python scripts/validate_handoff.py
+      - run: npm ci --prefix web/tools
+      - run: cd web && npm run types:generate
+      - run: git diff --exit-code -- web/src/schema.d.ts
+  speech-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: docker compose -f deploy/compose.test.yaml build tests
+      - run: docker compose -f deploy/compose.test.yaml up -d postgres s3
+      - run: docker compose -f deploy/compose.test.yaml run --rm tests
+      - run: docker compose -f deploy/compose.test.yaml --profile browser up -d browser
+      - run: npm ci --prefix web
+      - run: cd web && npx playwright install --with-deps chrome
+      - run: cd web && npm test
+        env:
+          VOICE_API_TARGET: http://127.0.0.1:18089
+          VOICE_WEB_TEST_KEY: browser-test-key
+      - if: always()
+        run: docker compose -f deploy/compose.test.yaml --profile browser down --volumes
   web:
     runs-on: ubuntu-latest
     defaults:

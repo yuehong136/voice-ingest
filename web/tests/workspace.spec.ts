@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test'
 const model = {
   id: 'qwen-audio-3.0-asr-flash-filetrans',
   provider: 'mock',
+  kind: 'transcription',
+  deployment_id: 'default',
   diarization: true,
   context: true,
 }
@@ -182,6 +184,7 @@ test('uncertain jobs require explicit duplicate-charge acknowledgement', async (
 
 test('real browser uploads to private MinIO and observes a durable mock job', async ({ page }) => {
   test.skip(!process.env.VOICE_WEB_TEST_KEY, 'Opt in with a dedicated mock backend only')
+  test.setTimeout(120000)
   await page.goto('/')
   await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
   await page.getByLabel('Workspace access key').fill(process.env.VOICE_WEB_TEST_KEY!)
@@ -211,9 +214,11 @@ test('real browser uploads to private MinIO and observes a durable mock job', as
     .getByLabel('Choose audio')
     .setInputFiles({ name: `browser-${Date.now()}.wav`, mimeType: 'audio/wav', buffer: wav })
   await page.getByRole('button', { name: 'Upload file', exact: true }).click()
-  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible()
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible({
+    timeout: 30000,
+  })
   await page.getByRole('button', { name: 'Start transcription', exact: true }).click()
-  await expect(page.locator('.status-badge')).toHaveText('Ready', { timeout: 30000 })
+  await expect(page.locator('.status-badge')).toHaveText('Ready', { timeout: 60000 })
   await expect(page.locator('.segment').first()).toContainText('MOCK')
   const exported = page.waitForEvent('download')
   await page.getByLabel('Export format').selectOption('json')

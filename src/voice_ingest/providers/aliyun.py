@@ -13,6 +13,8 @@ class AliyunProvider:
     name = "aliyun"
 
     def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None):
+        self.submission_response: dict[str, Any] | None = None
+        self.last_response: dict[str, Any] | None = None
         self.client = httpx.AsyncClient(
             base_url=settings.aliyun_base_url + "/",
             timeout=30,
@@ -36,6 +38,10 @@ class AliyunProvider:
             raise DomainError(
                 "provider_unavailable", "Provider request failed", 503, True
             ) from None
+        try:
+            self.last_response = response.json()
+        except ValueError:
+            self.last_response = {"http_status": response.status_code, "body": response.text}
         if response.status_code == 429:
             raise DomainError("provider_rate_limited", "Provider rate limit reached", 429, True)
         if response.status_code >= 500:
@@ -61,6 +67,7 @@ class AliyunProvider:
         return data
 
     async def submit(self, url: str, options: TranscriptionOptions, duration_ms: int) -> str:
+        self.last_response = self.submission_response = None
         source: dict[str, Any] = {"file_urls": [url]}
         if options.context:
             source["context"] = [
@@ -82,6 +89,7 @@ class AliyunProvider:
             json={"model": options.model, "input": source, "parameters": parameters},
         )
         task_id = response.get("output", {}).get("task_id")
+        self.submission_response = response
         if not isinstance(task_id, str) or not task_id:
             raise SubmissionUnknown()
         return task_id
@@ -91,21 +99,21 @@ class AliyunProvider:
         output = response.get("output", {})
         state = output.get("task_status")
         if state in {"PENDING", "RUNNING"}:
-            return PollResult("pending")
+            return PollResult("pending", raw=response)
         if state == "CANCELED":
-            return PollResult("cancelled")
+            return PollResult("cancelled", raw=response)
         if state == "FAILED":
-            return PollResult("failed", error_code="provider_task_failed")
+            return PollResult("failed", error_code="provider_task_failed", raw=response)
         if state == "SUCCEEDED":
             results = output.get("results", [])
             if len(results) != 1 or results[0].get("subtask_status") != "SUCCEEDED":
-                return PollResult("failed", error_code="provider_file_failed")
+                return PollResult("failed", error_code="provider_file_failed", raw=response)
             url = results[0].get("transcription_url")
             if not isinstance(url, str):
                 raise DomainError(
                     "invalid_provider_response", "Missing transcription result URL", 502
                 )
-            return PollResult("succeeded", result_url=url)
+            return PollResult("succeeded", result_url=url, raw=response)
         raise DomainError("invalid_provider_response", "Unknown provider task state", 502, True)
 
     async def fetch(self, url: str) -> dict[str, Any]:

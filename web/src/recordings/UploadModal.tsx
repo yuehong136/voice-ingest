@@ -25,12 +25,14 @@ export function UploadModal({
 }) {
   const [file, setFile] = useState<File | null>(draft?.file || null)
   const [uploaded, setUploaded] = useState<PreparedUpload | null>(draft?.uploaded || null)
-  const [model, setModel] = useState(models[0]?.id || '')
+  const [model, setModel] = useState(
+    models[0] ? `${models[0].deployment_id || 'default'}:${models[0].id}` : '',
+  )
   const [language, setLanguage] = useState('')
   const [diarization, setDiarization] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
   const controller = useRef<AbortController | null>(null)
-  const capability = models.find((m) => m.id === model)
+  const capability = models.find((m) => `${m.deployment_id || 'default'}:${m.id}` === model)
   const validFile = !!file && file.size > 0 && file.size <= 2_000_000_000
   useEffect(() => () => controller.current?.abort(), [])
   const mutation = useMutation({
@@ -43,7 +45,13 @@ export function UploadModal({
         setProgress(null)
         return null
       }
-      const options: Options = { model, language_hints: language ? [language] : [], diarization }
+      const options: Options = {
+        model: capability!.id,
+        routing: 'any',
+        deployment_id: capability!.deployment_id,
+        language_hints: language ? [language] : [],
+        diarization,
+      }
       return submitUploaded(api, uploaded, options, controller.current.signal)
     },
     onSuccess: (job) => {
@@ -149,7 +157,12 @@ export function UploadModal({
                   }}
                 >
                   {models.map((m) => (
-                    <option key={m.id}>{m.id}</option>
+                    <option
+                      key={`${m.deployment_id}:${m.id}`}
+                      value={`${m.deployment_id || 'default'}:${m.id}`}
+                    >
+                      {m.id} · {m.deployment_id || 'default'}
+                    </option>
                   ))}
                 </select>
               </label>

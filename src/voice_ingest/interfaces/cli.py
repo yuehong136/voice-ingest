@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from voice_ingest.client import AsyncVoiceClient, VoiceError
 from voice_ingest.client.api import fingerprint, save_state
+from voice_ingest.synthesis.contracts import SynthesisOptions
 from voice_ingest.transcription.contracts import ExportFormat, TranscriptionOptions
 
 app = typer.Typer(no_args_is_help=True, help="Durable offline audio transcription")
@@ -18,8 +19,124 @@ jobs = typer.Typer(no_args_is_help=True)
 assets = typer.Typer(no_args_is_help=True)
 app.add_typer(jobs, name="jobs")
 app.add_typer(assets, name="assets")
+syntheses = typer.Typer(no_args_is_help=True, help="Durable text-to-speech tasks")
+app.add_typer(syntheses, name="syntheses")
 configuration: dict[str, Any] = {}
 FORMATS = {"json", "txt", "markdown", "srt", "vtt"}
+
+
+@syntheses.command("submit")
+def submit_synthesis(
+    text_file: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    model: str = "qwen-audio-3.0-tts-flash",
+    voice: str = "longanhuan_v3.6",
+    deployment: str | None = None,
+    format: str = "mp3",
+    local_only: bool = False,
+    idempotency_key: str = typer.Option(..., help="Reuse this key if submission is interrupted"),
+):
+    """Read UTF-8 text from a file and explicitly submit paid synthesis."""
+
+    async def operation():
+        options = SynthesisOptions.model_validate(
+            dict(
+                model=model,
+                voice=voice,
+                deployment_id=deployment,
+                format=format,
+                routing="local_only" if local_only else "any",
+            )
+        )
+        async with client() as api:
+            text = await asyncio.to_thread(text_file.read_text, encoding="utf-8")
+            emit(await api.synthesize(text, options=options, idempotency_key=idempotency_key))
+
+    run(operation())
+
+
+@syntheses.command("voices")
+def synthesis_voices(model: str = "qwen-audio-3.0-tts-flash", deployment: str | None = None):
+    async def operation():
+        async with client() as api:
+            emit([v.model_dump() for v in await api.voices(model, deployment)])
+
+    run(operation())
+
+
+@syntheses.command("get")
+def get_synthesis(job_id: str):
+    async def operation():
+        async with client() as api:
+            emit(await api.get_synthesis(job_id))
+
+    run(operation())
+
+
+@syntheses.command("list")
+def list_syntheses(cursor: str | None = None, limit: int = 50):
+    async def operation():
+        async with client() as api:
+            emit(await api.list_syntheses(cursor, limit))
+
+    run(operation())
+
+
+@syntheses.command("cancel")
+def cancel_synthesis(job_id: str):
+    async def operation():
+        async with client() as api:
+            emit(await api.cancel_synthesis(job_id))
+
+    run(operation())
+
+
+@syntheses.command("retry")
+def retry_synthesis(job_id: str, acknowledge_duplicate_risk: bool = False):
+    async def operation():
+        async with client() as api:
+            emit(
+                await api.retry_synthesis(
+                    job_id, acknowledge_duplicate_risk=acknowledge_duplicate_risk
+                )
+            )
+
+    run(operation())
+
+
+@syntheses.command("result")
+def synthesis_result(job_id: str):
+    async def operation():
+        async with client() as api:
+            emit(await api.synthesis_result(job_id))
+
+    run(operation())
+
+
+@syntheses.command("download")
+def download_synthesis(job_id: str, output: Path):
+    async def operation():
+        async with client() as api:
+            data = await api.synthesis_audio(job_id)
+
+            # Avoid silently overwriting an existing recording or artifact.
+            def save():
+                with output.open("xb") as target:
+                    target.write(data)
+                return str(output.resolve())
+
+            emit({"job_id": job_id, "path": await asyncio.to_thread(save)})
+
+    run(operation())
+
+
+@syntheses.command("delete")
+def delete_synthesis(job_id: str):
+    async def operation():
+        async with client() as api:
+            await api.delete_synthesis(job_id)
+            emit({"job_id": job_id, "deleted": True})
+
+    run(operation())
 
 
 @app.callback()
@@ -133,6 +250,8 @@ def transcribe(
     diarization: bool = False,
     language: Annotated[list[str] | None, typer.Option("--language")] = None,
     context: str | None = None,
+    deployment: str | None = None,
+    local_only: bool = False,
 ):
     """Upload a local file and submit recognition. --wait polls without holding server requests."""
     selected = export_format(format)
@@ -148,6 +267,8 @@ def transcribe(
                     diarization=diarization,
                     language_hints=language or [],
                     context=context,
+                    deployment_id=deployment,
+                    routing="local_only" if local_only else "any",
                 ),
                 resume,
             )
@@ -175,6 +296,8 @@ def batch(
     resume: bool = False,
     model: str = "qwen-audio-3.0-asr-flash-filetrans",
     diarization: bool = False,
+    deployment: str | None = None,
+    local_only: bool = False,
 ):
     """Submit each audio file independently; --resume reuses recorded uploads and job IDs."""
     suffixes = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus", ".aac", ".amr", ".wma"}
@@ -193,7 +316,12 @@ def batch(
                     job = await submit_file(
                         api,
                         file,
-                        TranscriptionOptions(model=model, diarization=diarization),
+                        TranscriptionOptions(
+                            model=model,
+                            diarization=diarization,
+                            deployment_id=deployment,
+                            routing="local_only" if local_only else "any",
+                        ),
                         resume,
                     )
                     emit({"file": str(file), "job": job.model_dump(mode="json")})

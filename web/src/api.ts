@@ -64,6 +64,16 @@ export class Api {
     )
     return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('')
   }
+  async audio(id: string, signal?: AbortSignal) {
+    const response = await fetch(`/api/v1/syntheses/${encodeURIComponent(id)}/audio`, {
+      headers: { Authorization: `Bearer ${this.key}` },
+      credentials: 'omit',
+      redirect: 'error',
+      signal,
+    })
+    if (!response.ok) throw new Error(`Audio download failed (${response.status})`)
+    return response.blob()
+  }
 }
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)

@@ -35,6 +35,19 @@ Voice Ingest handles the work around cloud ASR: resumable uploads, asynchronous 
 
 ## Try the workspace
 
+For phase-1 speech synthesis, connect the backend, open **Speech synthesis**, select a configured
+model/deployment and voice, then explicitly submit text. Completed files can be played and downloaded.
+Aliyun's first preset is `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3; mock deployments expose
+`mock-tts` / `mock-voice` / WAV. Mock audio is synthetic silence, not a quality demonstration.
+Use `voice-ingest syntheses --help` for CLI operations, or `AsyncVoiceClient.synthesize()` followed by
+`get_synthesis()`, `synthesis_result()` and `synthesis_audio()` in Python. Remote/local MCP include
+`submit_synthesis`, `list_voices` and synthesis lifecycle/result tools. All application endpoints,
+including remote MCP, health, metrics and OpenAPI, are under `/v1`.
+
+Existing installations must run incremental migration `0002`; do not recreate the database.
+[Development design and acceptance](docs/plans/phase-1-aliyun-stt-tts.md) describe setup, tests,
+deployment selection, recovery and the separate paid acceptance gate.
+
 Explore the interface before setting up infrastructure. You need **Node.js 24 LTS** (minimum 22.12):
 
 ```bash
@@ -58,7 +71,7 @@ Run these commands from the repository root (`voice-ingest/`). If the frontend i
 cp .env.example .env
 # Edit .env: replace the API key, database password, and S3 credentials.
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
-curl --fail http://127.0.0.1:18080/health/ready
+curl --fail http://127.0.0.1:18080/v1/health/ready
 ```
 
 This starts a separate API, worker, PostgreSQL, and MinIO stack. The default local ports are **18080** (API) and **19000** (S3); 80/443 are unused.
@@ -77,17 +90,18 @@ uv run voice-ingest transcribe meeting.m4a --wait --format markdown
 
 Replace `meeting.m4a` with your audio file. `--wait` polls the job and prints Markdown when it succeeds. Omit it to return the job ID immediately; interrupting a wait does not cancel server-side work.
 
-> **Validation status:** Local tests and a real Aliyun recording test have passed. A complete Compose startup has not yet been validated; the last image build was interrupted by dependency download timeouts. See the [acceptance record](docs/acceptance.md).
+> **Validation status:** Phase-1 checks and real Aliyun STT/TTS acceptance passed on 2026-09-07, including worker restart recovery, cross-interface access, browser playback/download and user listening confirmation. See the [current handoff](docs/plans/phase-1-aliyun-stt-tts.md) for evidence and remaining quality/deployment limits. The [historical acceptance record](docs/acceptance.md) is preserved separately. Isolated acceptance does not establish production deployment readiness.
 
 ## Providers
 
 | Provider / model | Available behavior | Verification |
 | --- | --- | --- |
 | Mock | Complete upload/job/export workflow; synthetic text | Offline and PostgreSQL/MinIO integration tests |
-| Aliyun `qwen-audio-3.0-asr-flash-filetrans` | Default whole-file asynchronous ASR | Real 87-minute recording completed |
+| Aliyun `qwen-audio-3.0-asr-flash-filetrans` | Default whole-file asynchronous ASR | Historical 87-minute recording; phase-1 short-sample restart/export acceptance passed |
+| Aliyun `qwen-audio-3.0-tts-flash` | Complete-text synthesis, `longanhuan_v3.6`, MP3 | Real synthesis, browser playback/download and user listening confirmation passed |
 | Aliyun `fun-asr` | Explicit model selection | Adapter contract tests; no live acceptance yet |
 
-The current model checks allow files up to **12 hours / 2 GB**. Speaker diarization is rejected above two hours. Language hints, diarization, and context support depend on the model; inspect `voice-ingest models` or `/v1/models` for capabilities. Files are sent whole, without automatic compression or VAD splitting.
+The current STT model checks allow files up to **12 hours / 2 GB**. Speaker diarization is rejected above two hours. Language hints, diarization, and context support depend on the model; inspect `voice-ingest models` or `/v1/models` for capabilities. Files are sent whole, without automatic compression or VAD splitting.
 
 To enable Aliyun, edit `.env` and recreate the API and worker:
 
@@ -209,7 +223,7 @@ example tool calls, and authenticated downloads. Includes the boundaries for clo
 
 ### Connect a remote client
 
-Use `http://localhost:18080/mcp/` with `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`. Configure the URL and header using your client's HTTP MCP settings.
+Use `http://localhost:18080/v1/mcp/` with `Authorization: Bearer YOUR_VOICE_INGEST_API_KEY`. Configure the URL and header using your client's HTTP MCP settings.
 
 | Task | Tools |
 | --- | --- |
@@ -266,10 +280,10 @@ Download the OpenAPI schema for exact methods and request bodies:
 
 ```bash
 curl -H "Authorization: Bearer $VOICE_API_KEY" \
-  "$VOICE_URL/openapi.json" -o openapi.json
+  "$VOICE_URL/v1/openapi.json" -o openapi.json
 ```
 
-`/docs` also requires authentication. `/health/live` and `/health/ready` are public process/readiness checks; `/metrics` requires the service key.
+`/v1/docs` also requires authentication. `/v1/health/live` and `/v1/health/ready` are public process/readiness checks; `/v1/metrics` requires the service key.
 
 ## How it works
 
@@ -309,7 +323,7 @@ Read [AGENTS.md](AGENTS.md) before coding. Modules are organized by capability (
 
 ## Scope and documentation
 
-The current release focuses on offline ASR for a shared, trusted workspace. Realtime recognition, TTS, multi-tenancy, and automatic knowledge-base ingestion are outside the current implementation. TTS is a future direction, without a committed release date.
+The v1 speech framework implements file STT and complete-file TTS for a shared, trusted workspace. Phase 1 includes Aliyun adapters and explicit mock deployments. Realtime sessions, voice cloning, automatic text splitting, other vendors, local model hosting, multi-tenancy and knowledge-base ingestion remain out of scope. See the [phase record](docs/plans/phase-1-aliyun-stt-tts.md) for current acceptance evidence and quality/deployment limits.
 
 | Document | Contents |
 | --- | --- |

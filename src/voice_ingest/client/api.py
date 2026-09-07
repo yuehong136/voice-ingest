@@ -1,5 +1,7 @@
 """Public async client. No server, database or MCP imports."""
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
@@ -13,6 +15,14 @@ from uuid import uuid4
 import httpx
 
 from voice_ingest.media.contracts import PART_SIZE, UploadView
+from voice_ingest.synthesis.contracts import (
+    CreateSynthesis,
+    SynthesisJob,
+    SynthesisOptions,
+    SynthesisPage,
+    SynthesisResult,
+    Voice,
+)
 from voice_ingest.transcription.contracts import (
     TERMINAL,
     AssetView,
@@ -321,3 +331,87 @@ class AsyncVoiceClient:
 
     async def delete(self, job_id: str):
         await self._request("DELETE", f"v1/transcriptions/{job_id}")
+
+    async def voices(self, model: str, deployment_id: str | None = None) -> list[Voice]:
+        params = {"model": model}
+        if deployment_id:
+            params["deployment_id"] = deployment_id
+        return [
+            Voice.model_validate(v)
+            for v in (await self._request("GET", "v1/voices", params=params)).json()
+        ]
+
+    async def synthesize(
+        self,
+        text: str,
+        *,
+        options: SynthesisOptions | None = None,
+        idempotency_key: str | None = None,
+    ) -> SynthesisJob:
+        request = CreateSynthesis(text=text, options=options or SynthesisOptions())
+        return SynthesisJob.model_validate(
+            (
+                await self._request(
+                    "POST",
+                    "v1/syntheses",
+                    json=request.model_dump(),
+                    headers={"Idempotency-Key": idempotency_key or uuid4().hex},
+                )
+            ).json()
+        )
+
+    async def get_synthesis(self, job_id: str) -> SynthesisJob:
+        return SynthesisJob.model_validate(
+            (await self._request("GET", f"v1/syntheses/{job_id}")).json()
+        )
+
+    async def list_syntheses(self, cursor: str | None = None, limit: int = 50) -> SynthesisPage:
+        params: dict[str, Any] = {"limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+        return SynthesisPage.model_validate(
+            (await self._request("GET", "v1/syntheses", params=params)).json()
+        )
+
+    async def cancel_synthesis(self, job_id: str) -> SynthesisJob:
+        return SynthesisJob.model_validate(
+            (await self._request("POST", f"v1/syntheses/{job_id}/cancel")).json()
+        )
+
+    async def retry_synthesis(
+        self, job_id: str, *, acknowledge_duplicate_risk: bool = False
+    ) -> SynthesisJob:
+        return SynthesisJob.model_validate(
+            (
+                await self._request(
+                    "POST",
+                    f"v1/syntheses/{job_id}/retry",
+                    json={"acknowledge_duplicate_risk": acknowledge_duplicate_risk},
+                )
+            ).json()
+        )
+
+    async def wait_synthesis(
+        self,
+        job_id: str,
+        *,
+        timeout: float = 86400,  # noqa: ASYNC109
+        interval: float = 3,  # noqa: ASYNC109
+    ) -> SynthesisJob:  # noqa: ASYNC109
+        async with asyncio.timeout(timeout):
+            while True:
+                job = await self.get_synthesis(job_id)
+                if job.state in TERMINAL:
+                    return job
+                await asyncio.sleep(interval)
+
+    async def synthesis_result(self, job_id: str) -> SynthesisResult:
+        return SynthesisResult.model_validate(
+            (await self._request("GET", f"v1/syntheses/{job_id}/result")).json()
+        )
+
+    async def synthesis_audio(self, job_id: str) -> bytes:
+        return (await self._request("GET", f"v1/syntheses/{job_id}/audio")).content
+
+    async def delete_synthesis(self, job_id: str):
+        await self._request("DELETE", f"v1/syntheses/{job_id}")

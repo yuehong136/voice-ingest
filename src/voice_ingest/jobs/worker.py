@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import random
@@ -9,11 +10,14 @@ from typing import Any
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from voice_ingest.jobs.receipts import read_receipt
 from voice_ingest.media.probe import MediaProbe
 from voice_ingest.media.service import UploadService
 from voice_ingest.media.source import SignedSource, SourcePreparer
 from voice_ingest.media.storage import S3Storage
-from voice_ingest.providers.base import ASRProvider, SubmissionUnknown, normalize, validate_options
+from voice_ingest.providers.base import SubmissionUnknown
+from voice_ingest.providers.registry import Registry
+from voice_ingest.providers.speech import Accepted, Completed, SpeechRequest
 from voice_ingest.runtime.database import (
     Asset,
     Attempt,
@@ -39,12 +43,12 @@ class Worker:
         self,
         sessions: async_sessionmaker[AsyncSession],
         storage: S3Storage,
-        provider: ASRProvider,
+        registry: Registry,
         probe: MediaProbe,
         settings: Settings,
         source: SourcePreparer | None = None,
     ):
-        self.sessions, self.storage, self.provider = sessions, storage, provider
+        self.sessions, self.storage, self.registry = sessions, storage, registry
         self.probe, self.settings, self.id = probe, settings, uid()
         self.source = source or SignedSource(storage)
         self.stopping = asyncio.Event()
@@ -58,26 +62,39 @@ class Worker:
             if scheduler is None:
                 raise RuntimeError("Scheduler lock missing; run database migrations")
             timestamp = now()
-            slots = await session.scalar(
-                select(func.count())
-                .select_from(Job)
-                .where(
-                    or_(
-                        Job.state.in_(
-                            ["preparing", "submitting", "running", "finalizing", "cancel_requested"]
+            # Capacity counts unresolved submissions too and is isolated per deployment.
+            available = []
+            for deployment in self.registry.deployments.values():
+                slots = await session.scalar(
+                    select(func.count())
+                    .select_from(Job)
+                    .where(
+                        Job.deployment_id == deployment.id,
+                        or_(
+                            Job.state.in_(
+                                [
+                                    "preparing",
+                                    "submitting",
+                                    "running",
+                                    "finalizing",
+                                    "cancel_requested",
+                                ]
+                            ),
+                            Job.remote_may_run,
                         ),
-                        Job.remote_may_run,
                     )
                 )
-            )
-            eligible = set(ACTIVE)
-            if (slots or 0) >= self.settings.max_inflight:
-                eligible.discard("queued")
+                if (slots or 0) < deployment.max_inflight:
+                    available.append(deployment.id)
+            eligible = set(ACTIVE) - {"queued"}
             query = (
                 select(Job)
                 .where(
                     or_(
                         Job.state.in_(eligible),
+                        (Job.state == "queued") & Job.deployment_id.in_(available),
+                        (Job.state == "queued")
+                        & Job.deployment_id.not_in(list(self.registry.deployments)),
                         Job.state.in_(["cancelled", "failed"])
                         & Job.remote_may_run
                         & Job.provider_task_id.is_not(None),
@@ -130,7 +147,7 @@ class Worker:
             current.updated_at, current.next_run_at = now(), now() + timedelta(seconds=delay)
             attempt = await session.get(Attempt, (claimed.id, claimed.attempt))
             if attempt:
-                for key in ("provider_task_id", "raw_key", "result_key"):
+                for key in ("provider_task_id", "raw_key", "result_key", "capture_key"):
                     if key in values:
                         setattr(attempt, key, values[key])
             session.add(
@@ -178,7 +195,7 @@ class Worker:
         except DomainError as exc:
             retries = job.retry_count + 1
             if exc.info.retryable and retries <= self.settings.max_retry_count:
-                state = "preparing" if job.state == "submitting" else job.state
+                state = job.state
                 await self._safe_checkpoint(
                     job,
                     state,
@@ -223,21 +240,100 @@ class Worker:
         with contextlib.suppress(LeaseLost):
             await self.checkpoint(job, state, **values)
 
+    async def _receipt(self, job: Job) -> dict[str, Any] | None:
+        return await read_receipt(self.storage, job.capture_key)
+
+    async def _save_outcome(self, job: Job, outcome: Accepted | Completed):
+        assert job.capture_key
+        prefix = job.capture_key.removesuffix("/receipt.json")
+        raw_key = f"{prefix}/raw.json"
+        raw_bytes = json.dumps(outcome.raw).encode()
+        receipt: dict[str, Any] = {"job_id": job.id, "attempt": job.attempt, "raw_key": raw_key}
+        receipt["raw_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
+        if isinstance(outcome, Accepted):
+            receipt.update(kind="accepted", task_id=outcome.task_id)
+        else:
+            receipt["kind"] = "completed"
+            if outcome.audio is not None:
+                if not outcome.audio or len(outcome.audio) > 64 * 1024 * 1024:
+                    raise DomainError("invalid_audio", "Audio result is empty or too large")
+                audio_key = f"{prefix}/audio"
+                receipt.update(
+                    audio_key=audio_key,
+                    size=len(outcome.audio),
+                    sha256=hashlib.sha256(outcome.audio).hexdigest(),
+                )
+        await self.storage.put(
+            f"{prefix}/manifest.json", json.dumps(receipt).encode(), "application/json"
+        )
+        await self.storage.put(raw_key, raw_bytes, "application/json")
+        if isinstance(outcome, Completed) and outcome.audio is not None:
+            await self.storage.put(receipt["audio_key"], outcome.audio, "application/octet-stream")
+        # Receipt is the commit marker, written only after every complete object is durable.
+        await self.storage.put(job.capture_key, json.dumps(receipt).encode(), "application/json")
+        await self._apply_receipt(job, receipt)
+
+    async def _apply_receipt(self, job: Job, receipt: dict[str, Any]):
+        if receipt.get("job_id") != job.id or receipt.get("attempt") != job.attempt:
+            raise DomainError("invalid_receipt", "Result receipt does not match this attempt")
+        if receipt["kind"] == "accepted":
+            await self.checkpoint(
+                job,
+                "running",
+                provider_task_id=receipt["task_id"],
+                remote_may_run=True,
+                retry_count=0,
+                error=None,
+                delay=self.settings.poll_seconds,
+            )
+        elif receipt["kind"] == "completed":
+            await self.checkpoint(
+                job,
+                "finalizing",
+                raw_key=receipt["raw_key"],
+                audio_key=receipt.get("audio_key"),
+                remote_may_run=False,
+                retry_count=0,
+                error=None,
+            )
+        else:
+            raise DomainError("invalid_receipt", "Unknown result receipt kind")
+
     async def process(self, job: Job):
         async with self.sessions() as session:
-            asset = await session.get(Asset, job.asset_id)
+            asset = await session.get(Asset, job.asset_id) if job.asset_id else None
             attempt = await session.get(Attempt, (job.id, job.attempt))
-        assert asset and attempt
-        if attempt.provider != self.provider.name or attempt.region != self.settings.aliyun_region:
-            raise DomainError(
-                "provider_configuration_changed",
-                "Restore the provider configuration used by this task",
-                409,
+        assert attempt
+        if not attempt.deployment:
+            historical = self.registry.match_historical(
+                attempt.provider, attempt.region, attempt.request
             )
-        options = TranscriptionOptions.model_validate(job.options)
+            snapshot = historical.snapshot()
+            async with self.sessions.begin() as session:
+                current = await session.get(Job, job.id, with_for_update=True)
+                if (
+                    not current
+                    or current.generation != job.generation
+                    or current.lease_owner != self.id
+                    or not current.lease_until
+                    or current.lease_until <= now()
+                ):
+                    raise LeaseLost
+                saved_attempt = await session.get(Attempt, (job.id, job.attempt))
+                assert saved_attempt
+                saved_attempt.deployment = snapshot
+            attempt.deployment = snapshot
+        deployment = self.registry.restore(attempt.deployment)
+        adapter = deployment.adapter
+        request = SpeechRequest(
+            job.kind,
+            attempt.request["options"],
+            attempt.request.get("input", {}),
+            duration_ms=(asset.duration_ms or 0) if asset else 0,
+        )
         if job.state in {"cancelled", "failed"} and job.remote_may_run:
             assert job.provider_task_id
-            result = await self.provider.poll(job.provider_task_id)
+            result = await adapter.poll(job.provider_task_id)
             await self.checkpoint(
                 job,
                 job.state,
@@ -246,46 +342,92 @@ class Worker:
             )
             return
         if job.state == "cancel_requested":
+            receipt = await self._receipt(job)
+            if receipt:
+                await self._apply_receipt(job, receipt)
             remote_may_run = job.remote_may_run
-            if job.provider_task_id and job.result_url is None:
+            if job.provider_task_id and job.result_url is None and remote_may_run:
                 try:
-                    remote_may_run = not await self.provider.cancel(job.provider_task_id)
+                    remote_may_run = not await adapter.cancel(job.provider_task_id)
                 except DomainError:
                     remote_may_run = True
             await self.checkpoint(job, "cancelled", remote_may_run=remote_may_run)
             return
         if job.state == "submitting":
-            raise SubmissionUnknown()
+            receipt = await self._receipt(job)
+            if not receipt:
+                raise SubmissionUnknown()
+            await self._apply_receipt(job, receipt)
+            return
         elapsed = now().timestamp() - job.attempt_started_at.timestamp()
-        if elapsed > self.settings.job_deadline_seconds:
+        if elapsed > self.settings.job_deadline_seconds and job.state != "finalizing":
             raise DomainError(
                 "task_deadline", "Task deadline reached; inspect remote status before retry", 504
             )
         if job.state == "preparing":
-            if not asset.media_info:
-                info = await self.probe.inspect(asset.object_key, asset.sha256)
-                async with self.sessions.begin() as session:
-                    saved = await session.get(Asset, asset.id, with_for_update=True)
-                    assert saved
-                    saved.media_info, saved.duration_ms = info, info["duration_ms"]
-                asset.media_info, asset.duration_ms = info, info["duration_ms"]
-            validate_options(options, asset.duration_ms, asset.size, asset.media_info["format"])
-            url = await self.source.prepare(asset.object_key, asset.filename, options)
-            if not await self.checkpoint(job, "submitting", expected="preparing", error=None):
-                return
-            task_id = await self.provider.submit(url, options, asset.duration_ms or 0)
-            await self.checkpoint(
+            if asset:
+                if not asset.media_info:
+                    info = await self.probe.inspect(asset.object_key, asset.sha256)
+                    async with self.sessions.begin() as session:
+                        current = await session.get(Job, job.id, with_for_update=True)
+                        if (
+                            not current
+                            or current.generation != job.generation
+                            or current.lease_owner != self.id
+                            or not current.lease_until
+                            or current.lease_until.timestamp() <= now().timestamp()
+                        ):
+                            raise LeaseLost
+                        saved = await session.get(Asset, asset.id, with_for_update=True)
+                        assert saved
+                        saved.media_info, saved.duration_ms = info, info["duration_ms"]
+                    asset.media_info, asset.duration_ms = info, info["duration_ms"]
+                request.duration_ms = asset.duration_ms or 0
+                adapter.validate(request, size=asset.size, format_name=asset.media_info["format"])
+                source = deployment.source or self.source
+                request.source_url = await source.prepare(
+                    asset.object_key,
+                    asset.filename,
+                    TranscriptionOptions.model_validate(request.options),
+                )
+            else:
+                adapter.validate(request)
+            prefix = f"results/{job.id}/{job.attempt}/{job.generation}"
+            if not await self.checkpoint(
                 job,
-                "running",
-                provider_task_id=task_id,
+                "submitting",
+                expected="preparing",
+                error=None,
+                capture_key=f"{prefix}/receipt.json",
                 remote_may_run=True,
-                retry_count=0,
-                delay=self.settings.poll_seconds,
-            )
+            ):
+                return
+            try:
+                outcome = await adapter.start(request)
+            except SubmissionUnknown as exc:
+                await self._capture_failure(job, exc)
+                raise
+            except DomainError as exc:
+                await self._capture_failure(job, exc)
+                # Only explicit pre-submission/rejection errors permit automatic retry.
+                await self.checkpoint(
+                    job,
+                    "preparing" if exc.info.retryable else "failed",
+                    capture_key=None,
+                    remote_may_run=False,
+                )
+                raise
+            await self._save_outcome(job, outcome)
             return
         if job.state == "running":
             assert job.provider_task_id
-            result = await self.provider.poll(job.provider_task_id)
+            result = await adapter.poll(job.provider_task_id)
+            if result.raw:
+                await self.storage.put(
+                    f"results/{job.id}/{job.attempt}/{job.generation}/poll.json",
+                    json.dumps(result.raw).encode(),
+                    "application/json",
+                )
             if result.state == "pending":
                 await self.checkpoint(
                     job,
@@ -312,35 +454,56 @@ class Worker:
                     remote_may_run=False,
                     error={
                         "code": result.error_code or "provider_failed",
-                        "message": "Provider could not transcribe this file",
+                        "message": "Provider task failed",
                         "retryable": False,
                     },
                 )
             return
         if job.state == "finalizing":
             prefix = f"results/{job.id}/{job.attempt}/{job.generation}"
-            if job.raw_key:
-                raw = await self.storage.read_json(job.raw_key)
-            else:
+            if not job.raw_key:
+                receipt = await self._receipt(job)
+                if receipt and receipt.get("kind") == "completed":
+                    await self._apply_receipt(job, receipt)
+                    if job.state == "cancel_requested":
+                        return
+            if not job.raw_key:
                 assert job.result_url
-                raw = await self.provider.fetch(job.result_url)
-                await self.storage.put(
-                    f"{prefix}/raw.json", json.dumps(raw).encode(), "application/json"
-                )
-                if not await self.checkpoint(job, "finalizing", raw_key=f"{prefix}/raw.json"):
+                # Persist complete fetched output with the same receipt mechanism.
+                await self.checkpoint(job, "finalizing", capture_key=f"{prefix}/receipt.json")
+                await self._save_outcome(job, await adapter.fetch(job.result_url))
+                if job.state == "cancel_requested":
                     return
-            transcript = normalize(
-                raw,
-                job_id=job.id,
-                asset_id=asset.id,
-                provider=self.provider.name,
-                options=options,
-                duration_ms=asset.duration_ms or 0,
-            )
-            result_key = f"{prefix}/transcript.json"
-            await self.storage.put(
-                result_key, transcript.model_dump_json().encode(), "application/json"
-            )
+            assert job.raw_key
+            raw = await self.storage.read_json(job.raw_key)
+            context: dict[str, Any] = {
+                "job_id": job.id,
+                "asset_id": job.asset_id,
+                "deployment_id": deployment.id,
+                "deployment_revision": deployment.revision,
+            }
+            if job.kind == "synthesis":
+                receipt = await self._receipt(job)
+                if not receipt or not job.audio_key:
+                    raise DomainError("incomplete_audio", "Complete audio receipt is required")
+                info = await self.probe.inspect(job.audio_key, receipt["sha256"])
+                expected_format = request.options["format"]
+                if expected_format not in info["format"].split(",") or info["duration_ms"] <= 0:
+                    raise DomainError("invalid_audio", "Audio does not match the requested format")
+                streams = info.get("streams", [])
+                if (
+                    len(streams) != 1
+                    or int(streams[0].get("sample_rate", 0)) != request.options["sample_rate"]
+                ):
+                    raise DomainError(
+                        "invalid_audio", "Audio sample rate does not match the request"
+                    )
+                context.update(
+                    size=receipt["size"], sha256=receipt["sha256"], duration_ms=info["duration_ms"]
+                )
+            normalized = adapter.normalize(raw, request, context)
+            result_key = f"{prefix}/result.json"
+            await self.storage.put(result_key, json.dumps(normalized).encode(), "application/json")
             await self.checkpoint(
                 job,
                 "succeeded",
@@ -349,6 +512,13 @@ class Worker:
                 retry_count=0,
                 error=None,
                 remote_may_run=False,
+            )
+
+    async def _capture_failure(self, job: Job, error: DomainError):
+        if error.raw is not None and job.capture_key:
+            prefix = job.capture_key.removesuffix("/receipt.json")
+            await self.storage.put(
+                f"{prefix}/failure.json", json.dumps(error.raw).encode(), "application/json"
             )
 
     async def run(self):

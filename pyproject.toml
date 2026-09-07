@@ -18,7 +18,7 @@ Issues = "https://github.com/yuehong136/voice-ingest/issues"
 
 [project.optional-dependencies]
 cli = ["typer>=0.16,<1"]
-server = ["fastapi>=0.135.2,<1", "uvicorn>=0.35,<1", "sqlalchemy[asyncio]>=2.0.40,<2.1", "asyncpg>=0.30,<1", "alembic>=1.16,<2", "pydantic-settings>=2.10,<3", "boto3>=1.40,<2"]
+server = ["fastapi>=0.135.2,<1", "uvicorn>=0.35,<1", "sqlalchemy[asyncio]>=2.0.40,<2.1", "asyncpg>=0.30,<1", "alembic>=1.16,<2", "pydantic-settings>=2.10,<3", "boto3>=1.40,<2", "websockets>=15,<17"]
 mcp = ["fastmcp==4.0.2"]
 
 [dependency-groups]

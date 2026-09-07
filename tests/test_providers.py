@@ -6,7 +6,8 @@ from pydantic import SecretStr
 
 from voice_ingest.exports.render import render
 from voice_ingest.providers.aliyun import AliyunProvider
-from voice_ingest.providers.base import SubmissionUnknown, normalize, validate_options
+from voice_ingest.providers.aliyun_contracts import normalize, validate_options
+from voice_ingest.providers.base import SubmissionUnknown
 from voice_ingest.runtime.settings import Settings
 from voice_ingest.transcription.contracts import DomainError, TranscriptionOptions
 

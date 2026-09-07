@@ -11,13 +11,20 @@ from voice_ingest.media.service import UploadService
 from voice_ingest.media.storage import S3Storage
 from voice_ingest.providers.mock import MockProvider
 from voice_ingest.runtime.database import Asset, Base, SchedulerLock, database, uid
+from voice_ingest.runtime.deployments import create_registry
 from voice_ingest.runtime.settings import Settings
+from voice_ingest.synthesis.service import SynthesisService
 from voice_ingest.transcription.service import TranscriptionService
 
 
 class FixedProbe:
     async def inspect(self, key, expected_hash):
-        return {"duration_ms": 3_600_000, "format": "wav", "sha256_verified": True}
+        return {
+            "duration_ms": 3_600_000,
+            "format": "wav",
+            "sha256_verified": True,
+            "streams": [{"sample_rate": "22050", "channels": 1}],
+        }
 
 
 @pytest.fixture
@@ -43,9 +50,11 @@ async def env(tmp_path):
         storage = S3Storage(settings)
         storage.internal.create_bucket(Bucket=settings.s3_bucket)
         provider = MockProvider()
-        transcriptions = TranscriptionService(sessions, storage, settings)
+        registry = create_registry(settings, storage, provider)
+        registry.deployments["default"].source = None
+        transcriptions = TranscriptionService(sessions, storage, settings, registry)
         uploads = UploadService(sessions, storage)
-        worker = Worker(sessions, storage, provider, FixedProbe(), settings)
+        worker = Worker(sessions, storage, registry, FixedProbe(), settings)
         yield SimpleNamespace(
             settings=settings,
             engine=engine,
@@ -53,6 +62,7 @@ async def env(tmp_path):
             storage=storage,
             provider=provider,
             transcriptions=transcriptions,
+            syntheses=SynthesisService(sessions, storage, settings, worker.registry),
             uploads=uploads,
             worker=worker,
         )

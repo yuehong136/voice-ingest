@@ -1,6 +1,7 @@
 # Working on Voice Ingest
 
 - Read docs/architecture.md before cross-module changes. Business capabilities own their contracts and behavior.
+- For speech platform work read docs/design/voice-platform-v1.md and docs/plans/phase-1-aliyun-stt-tts.md; research evidence is in docs/references/voice-ai-open-source-research.md. All application APIs stay on /v1; phase 1 integrates only Aliyun STT/TTS. These repository documents are authoritative even without the personal voice-platform-development skill.
 - Core capabilities must not import HTTP, MCP or CLI modules. CLI and local MCP use the public async SDK.
 - Keep SDK-only installation free of server dependencies. Do not import optional frameworks at package import.
 - Durable jobs are PostgreSQL state machines. Never use an HTTP background task or MCP session as durable state.

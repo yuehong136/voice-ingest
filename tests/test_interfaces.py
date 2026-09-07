@@ -38,9 +38,9 @@ async def test_sdk_upload_and_all_surfaces(env, tmp_path):
         assert first.segments != second.segments
         for format in ("json", "txt", "markdown", "srt", "vtt"):
             assert await sdk.export(job.id, format)
-        async with Client(create_mcp(env.transcriptions)) as mcp:
+        async with Client(create_mcp(env.transcriptions, env.syntheses)) as mcp:
             tools = await mcp.list_tools()
-            assert len(tools) == 8
+            assert len(tools) == 15
             response = await mcp.call_tool("get_transcription", {"job_id": job.id})
             assert response.structured_content["id"] == job.id
             page = await mcp.call_tool("read_transcript", {"job_id": job.id, "limit": 1})
@@ -55,7 +55,7 @@ async def test_auth_validation_and_nonblocking_submit(env, asset):
         unauthorized = await http.get("/v1/models")
         assert unauthorized.status_code == 401
         assert unauthorized.json()["error"]["request_id"]
-        assert (await http.get("/health/live")).status_code == 200
+        assert (await http.get("/v1/health/live")).status_code == 200
         http.headers["Authorization"] = "Bearer test-api-key"
         invalid = await http.post("/v1/transcriptions", json={"bad": "sensitive input"})
         assert invalid.status_code == 422 and "sensitive input" not in invalid.text
@@ -95,7 +95,12 @@ def test_local_mcp_blocks_symlink_escape(tmp_path):
     allowed.mkdir()
     outside = tmp_path / "secret.wav"
     outside.write_bytes(b"private")
-    (allowed / "link.wav").symlink_to(outside)
+    try:
+        (allowed / "link.wav").symlink_to(outside)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks symlink creation privilege; covered on Linux CI")
+        raise
     with pytest.raises(DomainError, match="allowed directory"):
         allowed_file(str(allowed / "link.wav"), [allowed])
 
@@ -120,13 +125,13 @@ async def test_mcp_default_submission_survives_reconnect_and_local_bridge(env, a
     from voice_ingest.interfaces.local_mcp import create_local_mcp
     from voice_ingest.transcription.contracts import TranscriptionOptions
 
-    async with Client(create_mcp(env.transcriptions)) as remote:
+    async with Client(create_mcp(env.transcriptions, env.syntheses)) as remote:
         tool = next(t for t in await remote.list_tools() if t.name == "submit_transcription")
         assert tool.input_schema["required"] == ["asset_id"]
         first = await remote.call_tool("submit_transcription", {"asset_id": asset})
         job_id = first.structured_content["id"]
     await finish(env, job_id)
-    async with Client(create_mcp(env.transcriptions)) as remote:
+    async with Client(create_mcp(env.transcriptions, env.syntheses)) as remote:
         repeated = await remote.call_tool(
             "submit_transcription",
             {"asset_id": asset, "options": TranscriptionOptions().model_dump()},
@@ -147,7 +152,7 @@ async def test_mcp_default_submission_survives_reconnect_and_local_bridge(env, a
 
 
 async def test_mcp_explicit_keys_retain_conflicts_and_reject_empty_keys(env, asset):
-    async with Client(create_mcp(env.transcriptions)) as mcp:
+    async with Client(create_mcp(env.transcriptions, env.syntheses)) as mcp:
         args = {"asset_id": asset, "idempotency_key": "intentional-new-recognition"}
         first = await mcp.call_tool("submit_transcription", args)
         repeated = await mcp.call_tool("submit_transcription", args)

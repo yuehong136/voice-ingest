@@ -1,6 +1,7 @@
 import contextlib
 import hmac
 from datetime import timedelta
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, Query, Request
@@ -14,6 +15,13 @@ from voice_ingest.media.contracts import CreateUpload, SignedPart, UploadView
 from voice_ingest.runtime.container import Runtime, configure_logging
 from voice_ingest.runtime.database import Job, WorkerHeartbeat, now
 from voice_ingest.runtime.settings import Settings
+from voice_ingest.synthesis.contracts import (
+    CreateSynthesis,
+    SynthesisJob,
+    SynthesisPage,
+    SynthesisResult,
+    Voice,
+)
 from voice_ingest.transcription.contracts import (
     ACTIVE,
     AssetView,
@@ -48,7 +56,7 @@ class AuthMiddleware:
             await send(message)
 
         path = scope.get("path", "")
-        if path not in {"/health/live", "/health/ready"}:
+        if path not in {"/v1/health/live", "/v1/health/ready"}:
             header = dict(scope.get("headers", [])).get(b"authorization", b"")
             if not hmac.compare_digest(header, b"Bearer " + self.api_key):
                 response = JSONResponse(
@@ -100,7 +108,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     if settings.enable_mcp:
         from voice_ingest.interfaces.mcp import create_mcp
 
-        mcp_app = create_mcp(runtime.transcriptions).http_app(path="/")
+        mcp_app = create_mcp(runtime.transcriptions, runtime.syntheses).http_app(path="/")
 
     @contextlib.asynccontextmanager
     async def lifespan(app):
@@ -113,7 +121,15 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
                 if owned:
                     await runtime.close()
 
-    app = FastAPI(title="Voice Ingest", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Voice Ingest",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/v1/docs",
+        redoc_url="/v1/redoc",
+        openapi_url="/v1/openapi.json",
+        swagger_ui_oauth2_redirect_url="/v1/docs/oauth2-redirect",
+    )
     app.state.runtime = runtime
     app.add_middleware(AuthMiddleware, api_key=settings.api_key.get_secret_value())
 
@@ -142,22 +158,26 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
             status_code=422,
         )
 
-    @app.get("/health/live")
+    @app.get("/v1/health/live")
     async def live():
         return {"status": "alive"}
 
-    @app.get("/health/ready")
+    @app.get("/v1/health/ready")
     async def ready():
         try:
             async with runtime.sessions() as session:
                 await session.execute(text("SELECT 1"))
-                await session.execute(select(Job.id).limit(1))
+                # Read every mapped column so an unapplied speech migration is not ready.
+                await session.execute(select(Job).limit(1))
             await runtime.storage.health()
         except Exception:
             return JSONResponse({"status": "unavailable"}, status_code=503)
-        return {"status": "ready", "provider": settings.provider}
+        return {
+            "status": "ready",
+            "providers": sorted({m.provider for m in runtime.transcriptions.models()}),
+        }
 
-    @app.get("/metrics")
+    @app.get("/v1/metrics")
     async def metrics():
         async with runtime.sessions() as session:
             counts = (
@@ -221,8 +241,12 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         await runtime.uploads.delete_asset(asset_id)
 
     @app.get("/v1/models")
-    async def models() -> list[ModelCapability]:
-        return runtime.transcriptions.models()
+    async def models(
+        capability: Literal["transcription", "synthesis"] | None = None,
+    ) -> list[ModelCapability]:
+        return [
+            m for m in runtime.transcriptions.models() if capability is None or m.kind == capability
+        ]
 
     @app.post("/v1/transcriptions", status_code=202)
     async def create_transcription(
@@ -277,6 +301,54 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     async def delete_transcription(job_id: str):
         await runtime.transcriptions.delete(job_id)
 
+    @app.get("/v1/voices")
+    async def voices(model: str, deployment_id: str | None = None) -> list[Voice]:
+        return runtime.syntheses.voices(model, deployment_id)
+
+    @app.post("/v1/syntheses", status_code=202)
+    async def create_synthesis(
+        body: CreateSynthesis, idempotency_key: str = Header(min_length=1, max_length=200)
+    ) -> SynthesisJob:
+        return await runtime.syntheses.create(body, idempotency_key)
+
+    @app.get("/v1/syntheses")
+    async def list_syntheses(
+        cursor: str | None = None, limit: int = Query(50, ge=1, le=100)
+    ) -> SynthesisPage:
+        return await runtime.syntheses.list(cursor, limit)
+
+    @app.get("/v1/syntheses/{job_id}")
+    async def get_synthesis(job_id: str) -> SynthesisJob:
+        return await runtime.syntheses.get(job_id)
+
+    @app.post("/v1/syntheses/{job_id}/cancel")
+    async def cancel_synthesis(job_id: str) -> SynthesisJob:
+        return await runtime.syntheses.cancel(job_id)
+
+    @app.post("/v1/syntheses/{job_id}/retry")
+    async def retry_synthesis(job_id: str, body: RetryRequest) -> SynthesisJob:
+        return await runtime.syntheses.retry(job_id, body.acknowledge_duplicate_risk)
+
+    @app.get("/v1/syntheses/{job_id}/result")
+    async def synthesis_result(job_id: str) -> SynthesisResult:
+        return await runtime.syntheses.result(job_id)
+
+    @app.get("/v1/syntheses/{job_id}/audio")
+    async def synthesis_audio(job_id: str):
+        metadata = await runtime.syntheses.result(job_id)
+        return Response(
+            await runtime.syntheses.audio(job_id),
+            media_type=metadata.content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="speech.{metadata.format}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+
+    @app.delete("/v1/syntheses/{job_id}", status_code=204)
+    async def delete_synthesis(job_id: str):
+        await runtime.syntheses.delete(job_id)
+
     if mcp_app:
-        app.mount("/mcp", mcp_app)
+        app.mount("/v1/mcp", mcp_app)
     return app
