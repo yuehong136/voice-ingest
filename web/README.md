@@ -64,6 +64,11 @@ The optional web container listens on local port **18081**. Nginx serves the bui
 
 ## Checks and generated contracts
 
+To refresh the product images in both root READMEs, run `npm run screenshots`.
+It builds and captures the actual sample workspace in English and Chinese, on
+desktop and mobile, without a backend. See the [screenshot guide](../docs/assets/screenshots/README.md)
+for browser requirements, viewports, and review instructions.
+
 ```sh
 npm run check
 npm run build

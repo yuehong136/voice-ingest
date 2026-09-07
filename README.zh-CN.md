@@ -1,14 +1,19 @@
 # Voice Ingest
 
-**面向开发者与 AI Agent 的长录音转写服务。**
+**把长录音变成可阅读、可检索、可继续使用的文字。**
 
-上传一次，创建持久化任务，通过终端、Python 或 MCP 客户端获取结构化转写结果。
+面向个人、开发者与 AI Agent 的自托管转写工作台。在网页上传，用终端批量处理，或让 MCP 客户端接续同一个持久化任务。
 
 [English](README.md) · **简体中文**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-[快速开始](#快速开始) · [CLI](#cli) · [Python SDK](#python-sdk) · [MCP](#mcp) · [部署指南](docs/deployment.md) · [架构说明](docs/architecture.md)
+[体验工作台](#体验工作台) · [快速开始](#快速开始) · [Web 工作台](#web-工作台) · [MCP](#mcp) · [Python SDK](#python-sdk) · [CLI](#cli) · [部署指南](docs/deployment.md)
+
+![Voice Ingest 中文示例工作台：录音列表、说话人分段、原始时间戳、正文搜索与导出](docs/assets/screenshots/workspace-zh-CN.png)
+
+*实际运行的 Web 界面，使用项目内置的合成示例内容，未展示私人录音或真实 ASR 结果。[复现这些截图](docs/assets/screenshots/README.md)。*
 
 Voice Ingest 处理云端 ASR 周边的工程工作：断点续传、异步任务、重启恢复和统一导出。适用于个人或内部可信团队，通过 API Key 访问共享工作区。
 
@@ -16,14 +21,36 @@ Voice Ingest 处理云端 ASR 周边的工程工作：断点续传、异步任�
 
 - **长录音，有界内存。** 默认以 16 MiB 分片上传，每个文件最多四个分片并发；识别前通过 ffprobe 检查媒体。
 - **断开连接，任务继续。** PostgreSQL 保存进度和供应商任务 ID；worker 通过租约与执行代次恢复工作。
-- **四种入口，同一套任务。** HTTP、CLI、异步 Python SDK，以及基于 FastMCP 4.0.2 / MCP Python SDK v2 的 MCP 服务。
+- **五种入口，同一套任务。** Web、HTTP、CLI、异步 Python SDK 与 MCP 共用任务；网页上传后可将任务 ID 交给 Agent 接续处理。
 - **可复用的结果。** 保留供应商原始结果与标准 JSON，导出 TXT、Markdown、SRT、VTT；不填造缺失时间戳。
 - **明确的重试与计费行为。** 幂等键防止重复请求；供应商提交结果不确定时进入待处理状态，不自动重提。
 - **无需云密钥即可开发。** 模拟供应商可验证完整流程，不调用云识别、不产生识别费用。
 
+| 你想做什么 | 从这里开始 |
+| --- | --- |
+| 核对访谈或会议内容、查找正文、导出字幕 | [Web 工作台](#web-工作台) |
+| 批量转写文件夹中的录音，恢复中断的上传 | [CLI](#cli) |
+| 将转写接入 Python 应用 | [异步 Python SDK](#python-sdk) |
+| 让 Agent 上传文件、查询进度、按时间范围读取 | [MCP](#mcp) · [本地文件实践案例](docs/examples/cloud-backend-local-files.zh-CN.md) |
+
+## 体验工作台
+
+先体验界面，再配置基础设施。需要 **Node.js 24 LTS**（最低 22.12）：
+
+```bash
+git clone https://github.com/yuehong136/voice-ingest.git
+cd voice-ingest/web
+npm ci
+npm run dev
+```
+
+打开[本地工作台](http://127.0.0.1:5174)，点击 **Explore sample transcript**，再通过侧栏 **中文** 切换语言。可以搜索“时间戳”、切换导出格式。示例无需后端、API Key 或云账号，使用演示文本，不含原始音频。要处理自己的录音，请继续完成下方后端配置。
+
 ## 快速开始
 
 在项目本地目录中操作：后端需要 **Docker Compose**，CLI / SDK 开发需要 **Python 3.12 和 [uv](https://docs.astral.sh/uv/)**，无需本地 GPU。
+
+下列命令均在仓库根目录 `voice-ingest/` 执行。如果前端正在运行，保留该终端，另开一个终端进入仓库根目录。
 
 ### 1. 启动后端
 
@@ -77,17 +104,25 @@ VOICE_S3_PUBLIC_ENDPOINT=https://files.example.com
 
 **计费通道：** 当前适配常规 DashScope ASR，未接入 Token Plan / Coding Plan，也不会在计费通道间自动回退。`VOICE_API_KEY` 用于访问你的后端，`VOICE_ALIYUN_API_KEY` 用于后端调用阿里。详见[部署与凭证配置](docs/deployment.md)。
 
-## Web 演示工作台
+## Web 工作台
 
-可选的 [React 前端](web/README.md) 提供完整转写工作区：分步上传与确认转写、任务状态筛选、正文搜索及五种格式导出。默认英文，侧栏可切换中文。
+可选的 [React 前端](web/README.md) 将录音与转写结果放在同一个中英文工作区中。使用[上方体验命令](#体验工作台)启动，再通过服务密钥连接已运行的后端。
 
-```bash
-cd web
-npm ci
-npm run dev
-```
+1. **上传并确认。** 上传文件后选择识别设置；上传完成会停在确认页，点击“开始转写”才会提交任务。
+2. **跟踪与阅读。** 按状态筛选任务，核对说话人分段与原始时间戳，搜索已加载的正文。
+3. **导出或交给 Agent。** 下载 Markdown、TXT、JSON、SRT 或 VTT；连接后可复制任务 ID，通过 MCP 或 SDK 继续处理。
 
-打开 http://127.0.0.1:5174，使用服务密钥连接真实工作区，或主动选择无密钥示例体验。上传完成后停在确认页，点击“开始转写”才会提交任务；也可“稍后转写”，将文件 ID 交给 Agent。待转写文件保留在当前页面，刷新后重新选择同一文件即可恢复上传记录。客户演示流程、存储 CORS、部署与测试见[前端指南](web/README.md)。
+<details>
+<summary>查看移动端阅读界面</summary>
+
+<br>
+<img src="docs/assets/screenshots/reader-mobile-zh-CN.png" width="390" alt="390 像素移动端视口下的实际示例阅读界面，包含导出、句段时间轴与说话人分段">
+
+同一个响应式工作台，滚动至正文阅读区域。截图使用合成示例文本，不含原始音频。
+
+</details>
+
+**前后端同时在本机运行时：** Vite 将 `/api` 转发至 `http://127.0.0.1:18080`，浏览器上传还需可访问的 S3 地址及存储 CORS 配置。部署时，可选 Web 容器使用 **18081** 端口。选择“稍后转写”可将待处理文件保留在当前页面，刷新后重新选择同一文件即可恢复上传记录。配置、分步确认流程、部署与测试见[前端指南](web/README.md)。
 
 ## CLI
 
@@ -147,6 +182,20 @@ asyncio.run(main())
 重试同一次提交时复用幂等键，参数变化时换新键。`needs_attention` 表示供应商可能已经接受任务；取消后若 `remote_may_run=true`，远端仍可能执行并计费。
 
 ## MCP
+
+让 Agent 接收录音，保留一个随时可继续查询的任务 ID。Agent 可以查询进度、按时间范围读取正文、请求导出；后端会在工具调用之间持续处理任务。
+
+```mermaid
+flowchart LR
+    File[本地录音] --> Upload[upload_local_audio]
+    Upload --> Asset[asset_id]
+    Asset --> Submit[submit_transcription]
+    Submit --> Job[job_id]
+    Job --> Read[read_transcript]
+    Job --> Export[export_transcript]
+```
+
+`upload_local_audio` 由本地桥接器提供。先通过 `get_transcription` 查询至任务成功，再读取或导出；仅使用远程客户端时，从已有文件或任务开始。
 
 ### 实践案例：云端后端，本地录音
 
@@ -264,6 +313,8 @@ uv build
 
 | 文档 | 内容 |
 | --- | --- |
+| [Web 工作台](web/README.md) | 浏览器配置、上传确认、存储 CORS 与前端检查（英文） |
+| [云端后端 + 本地录音](docs/examples/cloud-backend-local-files.zh-CN.md) | 包含客户端配置与导出的完整 MCP 实践 |
 | [部署指南](docs/deployment.md) | 配置、私有存储、HTTP/HTTPS、凭证与运维（英文） |
 | [架构说明](docs/architecture.md) | 模块边界、持久化、恢复与权衡（英文） |
 | [架构决策](docs/decisions/0001-durable-capabilities.md) | 持久化任务与按能力组织代码（英文） |

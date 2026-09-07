@@ -1,14 +1,19 @@
 # Voice Ingest
 
-**Long-form audio transcription for developers and AI agents.**
+**Turn long recordings into transcripts you can read, search, and build with.**
 
-Upload once. Submit a durable job. Retrieve structured transcripts from your terminal, Python code, or MCP client.
+A self-hosted transcription workspace for people, developers, and AI agents. Upload in your browser, automate from your terminal, or let an MCP client continue the same durable job.
 
 **English** · [简体中文](README.zh-CN.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-[Quickstart](#quickstart) · [CLI](#cli) · [Python SDK](#python-sdk) · [MCP](#mcp) · [Deployment](docs/deployment.md) · [Architecture](docs/architecture.md)
+[Try the UI](#try-the-workspace) · [Quickstart](#quickstart) · [Web workspace](#web-workspace) · [MCP](#mcp) · [Python SDK](#python-sdk) · [CLI](#cli) · [Deployment](docs/deployment.md)
+
+![Voice Ingest sample workspace showing recordings, speaker-labeled transcript segments, timestamps, search, and export controls](docs/assets/screenshots/workspace-en.png)
+
+*Actual running Web UI with built-in synthetic sample content. No private recordings or real ASR results are shown. [Reproduce these screenshots](docs/assets/screenshots/README.md).*
 
 Voice Ingest handles the work around cloud ASR: resumable uploads, asynchronous jobs, restart recovery, and consistent exports. It is built for personal use and trusted teams sharing an API-key-protected workspace.
 
@@ -16,14 +21,36 @@ Voice Ingest handles the work around cloud ASR: resumable uploads, asynchronous 
 
 - **Long recordings, bounded memory.** Upload in 16 MiB parts with four concurrent parts per file; validate media with ffprobe before recognition.
 - **Jobs survive client disconnects.** PostgreSQL persists progress and provider task IDs. Workers use leases and execution generations to recover work safely.
-- **One workflow, four interfaces.** HTTP, CLI, an async Python SDK, and FastMCP 4.0.2 with MCP Python SDK v2 address the same jobs.
+- **One workflow, five interfaces.** Web, HTTP, CLI, an async Python SDK, and MCP address the same jobs. Upload in the browser and pass the job ID to an agent.
 - **Results you can reuse.** Keep raw provider output and normalized JSON; export TXT, Markdown, SRT, and VTT. Missing timestamps stay missing.
 - **Explicit retry and billing behavior.** Idempotency keys prevent duplicate requests. Uncertain provider submissions require attention instead of automatic resubmission.
 - **Develop without cloud credentials.** The mock provider exercises the workflow without recognition charges or provider network calls.
 
+| What you want to do | Start here |
+| --- | --- |
+| Review an interview or meeting, search its text, export subtitles | [Web workspace](#web-workspace) |
+| Transcribe a folder and resume interrupted uploads | [CLI](#cli) |
+| Add transcription to a Python application | [Async Python SDK](#python-sdk) |
+| Let an agent upload, check progress, and read selected time ranges | [MCP](#mcp) · [Local-file recipe](docs/examples/cloud-backend-local-files.md) |
+
+## Try the workspace
+
+Explore the interface before setting up infrastructure. You need **Node.js 24 LTS** (minimum 22.12):
+
+```bash
+git clone https://github.com/yuehong136/voice-ingest.git
+cd voice-ingest/web
+npm ci
+npm run dev
+```
+
+Open [the local workspace](http://127.0.0.1:5174) and click **Explore sample transcript**. Search for `timestamps`, switch export formats, or use **中文** in the sidebar. The sample needs no backend, API key, or cloud account; it uses illustrative text without source audio. To transcribe your own recordings, continue with the backend quickstart below.
+
 ## Quickstart
 
 From a local checkout, use **Docker Compose** for the backend and **Python 3.12 + [uv](https://docs.astral.sh/uv/)** for CLI/SDK development. No local GPU is required.
+
+Run these commands from the repository root (`voice-ingest/`). If the frontend is running in another terminal, leave it running and open a new terminal at the root.
 
 ### 1. Start the backend
 
@@ -79,15 +106,23 @@ For local real-ASR evaluation without public S3, set `VOICE_ALIYUN_SOURCE_MODE=t
 
 ## Web workspace
 
-The optional [React frontend](web/README.md) provides a transcription workspace with separate upload and recognition steps, status filters, transcript search and five export formats. English is the default; Chinese is available in the sidebar.
+The optional [React frontend](web/README.md) brings recordings and transcripts into one English/Chinese workspace. Start it with the [preview commands above](#try-the-workspace), then connect to your running backend with its service key.
 
-```bash
-cd web
-npm ci
-npm run dev
-```
+1. **Upload and review.** Upload a file, then choose recognition settings. Uploading stops at a review step; **Start transcription** submits the job.
+2. **Follow and read.** Filter jobs by status, review speaker labels and original timestamps, and search loaded transcript text.
+3. **Export or continue with an agent.** Download Markdown, TXT, JSON, SRT, or VTT. Copy the job ID from a connected workspace for an MCP or SDK follow-up.
 
-Open http://127.0.0.1:5174 and connect your workspace with its service key, or explicitly explore a sample transcript without credentials. Uploading stops at a review step; **Start transcription** submits the job. See the [web guide](web/README.md) for a customer walkthrough, storage CORS, deployment and tests.
+<details>
+<summary>Mobile transcript reader</summary>
+
+<br>
+<img src="docs/assets/screenshots/reader-mobile-en.png" width="390" alt="Actual sample transcript reader at a 390-pixel mobile viewport, with export controls, a segment timeline, and speaker-labeled text">
+
+The same responsive workspace, scrolled to the reader. Sample text is synthetic; no source audio is included.
+
+</details>
+
+**Running both services locally:** Vite forwards `/api` to `http://127.0.0.1:18080`. Browser uploads also need a reachable S3 endpoint and storage CORS. For deployment, the optional web container uses port **18081**. See the [web guide](web/README.md) for configuration, the upload review flow, deployment, and tests.
 
 ## CLI
 
@@ -147,6 +182,20 @@ asyncio.run(main())
 Reuse an idempotency key when retrying the same submission; use a new key for changed parameters. A job in `needs_attention` may already have been accepted by the provider. A cancellation with `remote_may_run=true` means the provider may still execute and charge for recognition.
 
 ## MCP
+
+Give your agent a recording and keep a job ID you can return to. The agent can poll progress, read a time range, and request exports; the backend keeps working between tool calls.
+
+```mermaid
+flowchart LR
+    File[Local recording] --> Upload[upload_local_audio]
+    Upload --> Asset[asset_id]
+    Asset --> Submit[submit_transcription]
+    Submit --> Job[job_id]
+    Job --> Read[read_transcript]
+    Job --> Export[export_transcript]
+```
+
+The local bridge supplies `upload_local_audio`. Poll `get_transcription` until the job succeeds before reading or exporting; a remote-only client starts with an existing asset or job.
 
 ### Recipe: cloud backend, local recording
 
@@ -264,6 +313,8 @@ The current release focuses on offline ASR for a shared, trusted workspace. Real
 
 | Document | Contents |
 | --- | --- |
+| [Web workspace](web/README.md) | Browser setup, upload review, storage CORS, and frontend checks |
+| [Cloud backend + local recording](docs/examples/cloud-backend-local-files.md) | A complete MCP workflow with client configuration and exports |
 | [Deployment](docs/deployment.md) | Configuration, private storage, HTTP/HTTPS, credentials, operations |
 | [Architecture](docs/architecture.md) | Module boundaries, persistence, recovery, and tradeoffs |
 | [Architecture decision](docs/decisions/0001-durable-capabilities.md) | Durable jobs and capability-oriented organization |
