@@ -4,6 +4,8 @@
     system-ui,
     -apple-system,
     'PingFang SC',
+    'Microsoft YaHei',
+    'Noto Sans CJK SC',
     sans-serif;
   color: #263651;
   background: #f5f7fa;
@@ -290,7 +292,7 @@ main {
   margin-bottom: 28px;
 }
 .page-heading h1 {
-  font-family: 'Manrope Variable', 'PingFang SC', sans-serif;
+  font-family: 'Manrope Variable', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   font-size: 27px;
   letter-spacing: -1.2px;
   line-height: 1.5;
@@ -506,7 +508,7 @@ main {
   padding: 26px 29px 22px;
 }
 .reader-heading h2 {
-  font-family: 'Manrope Variable', 'PingFang SC', sans-serif;
+  font-family: 'Manrope Variable', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.6px;
@@ -846,7 +848,7 @@ dialog header {
 }
 dialog h2 {
   font-size: 21px;
-  font-family: 'Manrope Variable', 'PingFang SC', sans-serif;
+  font-family: 'Manrope Variable', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   letter-spacing: -0.5px;
 }
 dialog form > p {
