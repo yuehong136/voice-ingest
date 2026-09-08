@@ -3,6 +3,8 @@ services:
     build:
       context: ../web
       dockerfile: Dockerfile
+      args:
+        VOICE_NPM_REGISTRY: ${VOICE_NPM_REGISTRY:-https://registry.npmjs.org}
     ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:${VOICE_WEB_PORT:-18081}:8080"]
     depends_on:
       api: {condition: service_healthy}

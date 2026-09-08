@@ -2,6 +2,8 @@
 
 Release review, isolated deployment and offline PostgreSQL/S3 backup and restore:
 [deployment rehearsal runbook](operations/deployment-rehearsal.md).
+Self-hosted interface examples and the commit-based update flow are documented in the
+[Chinese remote-deployment handoff](operations/remote-deployment-handoff.zh-CN.md).
 
 ## Independent deployment
 
@@ -37,6 +39,12 @@ docker compose --env-file .env -f deploy/compose.yaml config --quiet
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
 curl http://127.0.0.1:18080/v1/health/ready
 ```
+
+Build registries are configurable without editing Dockerfiles. The defaults use the official
+Debian, PyPI and npm endpoints. Hosts in regions where those endpoints are slow may set
+`VOICE_APT_MIRROR`, `VOICE_PYPI_INDEX_URL` and `VOICE_NPM_REGISTRY` to trusted mirrors in the
+deployment env file. Treat mirrors as part of the software supply chain: use HTTPS where supported,
+keep the lockfiles frozen and return to the defaults when the regional override is no longer needed.
 
 Choose a database password without URL-reserved characters in the sample Compose URL, or supply an
 appropriately URL-encoded database URL in your own deployment configuration. Do not print a full

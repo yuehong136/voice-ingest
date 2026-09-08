@@ -1,7 +1,8 @@
 FROM node:24-alpine AS build
+ARG VOICE_NPM_REGISTRY=https://registry.npmjs.org
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --registry "$VOICE_NPM_REGISTRY"
 COPY . .
 RUN npm run build
 FROM nginx:stable-alpine
