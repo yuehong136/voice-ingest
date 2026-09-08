@@ -192,7 +192,8 @@ ssh "$DEPLOY_HOST" \
 和备份不会自动删除。
 
 构建默认使用官方上游；受限网络可在部署 env 中设置 `VOICE_APT_MIRROR`、
-`VOICE_PYPI_INDEX_URL` 和 `VOICE_NPM_REGISTRY`。锁文件仍保持 frozen。镜像站属于供应链的一部分，不能使用
+`VOICE_PYPI_INDEX_URL` 和 `VOICE_NPM_REGISTRY`。仅当可信内网 Python 索引不支持 HTTPS 时，才设置
+`VOICE_PYPI_TRUSTED_HOST`；HTTPS 索引必须留空。锁文件仍保持 frozen。镜像站属于供应链的一部分，不能使用
 不受信任的临时镜像。
 
 如果发布失败，不要自动回滚数据库：先查看日志和备份位置，判断迁移是否已执行。容器回退不能撤销 Alembic

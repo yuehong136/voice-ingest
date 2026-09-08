@@ -13,6 +13,7 @@ release_root=${VOICE_RELEASE_ROOT:-/opt/voice-ingest/releases}
 backup_root=${VOICE_BACKUP_ROOT:-/var/backups/voice-ingest}
 env_file=${VOICE_ENV_FILE:-/etc/voice-ingest/voice-ingest.env}
 project=${VOICE_COMPOSE_PROJECT:-voice-ingest}
+state_root=$(dirname "$current_link")
 
 if [[ ! -d "$app_repo/.git" || ! -f "$env_file" ]]; then
     echo "Missing server checkout or deployment environment file" >&2
@@ -20,6 +21,13 @@ if [[ ! -d "$app_repo/.git" || ! -f "$env_file" ]]; then
 fi
 if [[ -n "$(git -C "$app_repo" status --porcelain)" ]]; then
     echo "Server base checkout is dirty; preserve or remove those changes before release" >&2
+    exit 1
+fi
+
+api_port=$(sed -n 's/^VOICE_API_PORT=//p' "$env_file" | tail -n 1)
+api_port=${api_port:-18080}
+if [[ ! "$api_port" =~ ^[0-9]+$ ]]; then
+    echo "VOICE_API_PORT must be numeric" >&2
     exit 1
 fi
 
@@ -70,9 +78,9 @@ python3 "$current_source/scripts/deployment_snapshot.py" backup \
 "${target_compose[@]}" up -d
 
 for _ in $(seq 1 30); do
-    if curl --fail --silent --show-error http://127.0.0.1:18080/v1/health/ready >/dev/null; then
+    if curl --fail --silent --show-error "http://127.0.0.1:${api_port}/v1/health/ready" >/dev/null; then
         ln -sfn "$release_dir" "$current_link"
-        printf '%s\n' "$target_commit" > /opt/voice-ingest/deployed-commit
+        printf '%s\n' "$target_commit" > "$state_root/deployed-commit"
         echo "Deployment healthy: $target_commit"
         echo "Pre-upgrade snapshot: $backup_dir"
         exit 0
