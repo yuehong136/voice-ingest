@@ -8,6 +8,7 @@ x-runtime: &runtime
       VOICE_APT_MIRROR: ${VOICE_APT_MIRROR:-deb.debian.org}
       VOICE_PYPI_INDEX_URL: ${VOICE_PYPI_INDEX_URL:-https://pypi.org/simple}
       VOICE_PYPI_TRUSTED_HOST: ${VOICE_PYPI_TRUSTED_HOST:-}
+      VOICE_PYPI_FIND_LINKS: ${VOICE_PYPI_FIND_LINKS:-}
   env_file: ${VOICE_ENV_FILE:-../.env}
   environment:
     VOICE_DATABASE_URL: postgresql+asyncpg://voice:${VOICE_DB_PASSWORD:?set VOICE_DB_PASSWORD}@postgres:5432/voice

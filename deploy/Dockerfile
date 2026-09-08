@@ -2,6 +2,7 @@ FROM python:3.13.11-slim-bookworm
 ARG VOICE_APT_MIRROR=deb.debian.org
 ARG VOICE_PYPI_INDEX_URL=https://pypi.org/simple
 ARG VOICE_PYPI_TRUSTED_HOST=
+ARG VOICE_PYPI_FIND_LINKS=
 RUN if [ "$VOICE_APT_MIRROR" != "deb.debian.org" ]; then \
         sed -i "s|deb.debian.org|$VOICE_APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; \
     fi \
@@ -18,9 +19,20 @@ COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
 RUN if [ -n "$VOICE_PYPI_TRUSTED_HOST" ]; then \
         export UV_INSECURE_HOST="$VOICE_PYPI_TRUSTED_HOST"; \
-    fi \
-    && UV_DEFAULT_INDEX="$VOICE_PYPI_INDEX_URL" \
-        uv sync --frozen --no-dev --extra server --extra mcp --no-editable
+    fi; \
+    if [ -n "$VOICE_PYPI_FIND_LINKS" ]; then \
+        uv export --frozen --no-dev --extra server --extra mcp --no-emit-project \
+            --format requirements.txt --output-file /tmp/requirements.txt \
+        && uv venv .venv \
+        && uv pip install --python .venv/bin/python --no-index \
+            --find-links "$VOICE_PYPI_FIND_LINKS" --require-hashes --no-deps \
+            --requirements /tmp/requirements.txt \
+        && uv pip install --python .venv/bin/python --no-index \
+            --find-links "$VOICE_PYPI_FIND_LINKS" --no-deps .; \
+    else \
+        UV_DEFAULT_INDEX="$VOICE_PYPI_INDEX_URL" \
+            uv sync --frozen --no-dev --extra server --extra mcp --no-editable; \
+    fi
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY deploy/init_storage.py ./deploy/init_storage.py

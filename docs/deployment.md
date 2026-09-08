@@ -46,7 +46,9 @@ Debian, PyPI and npm endpoints. Hosts in regions where those endpoints are slow 
 deployment env file. An internal HTTP-only Python index additionally requires
 `VOICE_PYPI_TRUSTED_HOST`; leave it empty for HTTPS indexes. Treat mirrors as part of the software
 supply chain: use HTTPS where supported, keep the lockfiles frozen and return to the defaults when
-the regional override is no longer needed.
+the regional override is no longer needed. For an offline build, `VOICE_PYPI_FIND_LINKS` may point
+to a trusted flat wheel directory or URL containing every locked Linux wheel and the declared build
+backend. That path exports the frozen lock with hashes and installs without consulting an index.
 
 Choose a database password without URL-reserved characters in the sample Compose URL, or supply an
 appropriately URL-encoded database URL in your own deployment configuration. Do not print a full
