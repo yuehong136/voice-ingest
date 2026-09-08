@@ -165,13 +165,17 @@ class JobService[V: Contract, P: Contract]:
         async with self.sessions() as session:
             before = await self._load(session, job_id)
             capture_key = before.capture_key
-        receipt = await read_receipt(self.storage, capture_key)
+        # Inspect without writing: concurrent DELETE may already have removed this prefix.
+        # The leased Worker can rebuild a verified marker after retry commits successfully.
+        receipt = await read_receipt(self.storage, capture_key, persist=False)
         async with self.sessions.begin() as session:
             job = await self._load(session, job_id, True)
             if job.capture_key != capture_key:
                 raise DomainError("job_changed", "Task changed; read its status again", 409)
             if job.state not in {"failed", "needs_attention", "cancelled"}:
                 raise DomainError("not_retryable", "Task is not in a retryable state", 409)
+            if (job.error or {}).get("code") == "result_deleted":
+                raise DomainError("result_deleted", "Deleted tasks cannot be retried", 409)
             if job.lease_until and job.lease_until.timestamp() > now().timestamp():
                 raise DomainError("worker_still_active", "Wait for the active worker lease", 409)
             if job.asset_id:
@@ -237,6 +241,10 @@ class JobService[V: Contract, P: Contract]:
             job = await self._load(session, job_id, True)
             if job.state in ACTIVE or job.remote_may_run:
                 raise DomainError("job_in_use", "Task may still be running", 409)
+            if job.lease_until and job.lease_until > now():
+                raise DomainError("worker_still_active", "Wait for the active worker lease", 409)
+            job.generation += 1
+            job.lease_owner = job.lease_until = None
             job.state, job.result_key = "failed", None
             job.raw_key = job.result_url = job.audio_key = job.capture_key = None
             job.input = {}
@@ -245,6 +253,7 @@ class JobService[V: Contract, P: Contract]:
                 "message": "Results explicitly deleted",
                 "retryable": False,
             }
+            job.updated_at = now()
             attempts = await session.scalars(select(Attempt).where(Attempt.job_id == job.id))
             for attempt in attempts:
                 attempt.request = {"options": job.options, "asset_id": job.asset_id}

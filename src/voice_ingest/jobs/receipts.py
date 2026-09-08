@@ -8,7 +8,9 @@ from voice_ingest.jobs.contracts import DomainError
 from voice_ingest.media.storage import S3Storage
 
 
-async def read_receipt(storage: S3Storage, key: str | None) -> dict[str, Any] | None:
+async def read_receipt(
+    storage: S3Storage, key: str | None, *, persist: bool = True
+) -> dict[str, Any] | None:
     if not key:
         return None
     try:
@@ -35,5 +37,6 @@ async def read_receipt(storage: S3Storage, key: str | None) -> dict[str, Any] | 
         if exc.info.code == "storage_not_found":
             return None
         raise
-    await storage.put(key, json.dumps(manifest).encode(), "application/json")
+    if persist:
+        await storage.put(key, json.dumps(manifest).encode(), "application/json")
     return manifest

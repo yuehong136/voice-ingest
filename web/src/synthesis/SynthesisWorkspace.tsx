@@ -351,7 +351,11 @@ export function SynthesisWorkspace({
                       )}
                       <button
                         className="secondary"
-                        disabled={action.isPending}
+                        disabled={
+                          action.isPending ||
+                          job.error?.code === 'result_deleted' ||
+                          ((job.remote_may_run || job.state === 'needs_attention') && !risk)
+                        }
                         onClick={() => action.mutate('retry')}
                       >
                         {t('Retry / recover', '重试 / 恢复')}

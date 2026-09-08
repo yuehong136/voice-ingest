@@ -69,12 +69,16 @@ Run these commands from the repository root (`voice-ingest/`). If the frontend i
 
 ```bash
 cp .env.example .env
-# Edit .env: replace the API key, database password, and S3 credentials.
+# Edit .env: replace API/database/S3 credentials.
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
 curl --fail http://127.0.0.1:18080/v1/health/ready
 ```
 
 This starts a separate API, worker, PostgreSQL, and MinIO stack. The default local ports are **18080** (API) and **19000** (S3); 80/443 are unused.
+
+Object storage uses **PGSTY Silo**, a community-maintained MinIO fork, pinned to
+`RELEASE.2026-09-03T13-18-01Z`. It requires no AIStor activation file.
+See the [deployment guide](docs/deployment.md) for release provenance and acceptance status.
 
 The default provider is `mock`. Its output is labeled `[MOCK]` and does not transcribe the contents of your recording. The health request should return HTTP 200 once initialization completes.
 

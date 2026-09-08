@@ -60,6 +60,9 @@ From the repository root:
 docker compose --env-file .env -f deploy/compose.yaml -f deploy/compose.web.yaml up -d --build
 ```
 
+Object storage uses the pinned PGSTY Silo community release and requires no AIStor activation file;
+see the [deployment guide](../docs/deployment.md).
+
 The optional web container listens on local port **18081**. Nginx serves the built SPA and proxies `/api` to the API on the internal network, so backend API CORS is not necessary. No keys are baked into the bundle. Use a TLS reverse proxy for public access. Full Compose deployment is a separate acceptance step.
 
 ## Checks and generated contracts

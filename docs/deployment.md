@@ -1,5 +1,8 @@
 # Deployment and real-provider acceptance
 
+Release review, isolated deployment and offline PostgreSQL/S3 backup and restore:
+[deployment rehearsal runbook](operations/deployment-rehearsal.md).
+
 ## Independent deployment
 
 Use `deploy/compose.yaml` with a dedicated project directory and `.env`. Its PostgreSQL is private to
@@ -7,19 +10,31 @@ the Compose network, its S3 data and database have separate project-owned volume
 management console is published. It uses 18080 (API/MCP) and 19000 (S3), leaving 80/443 and the existing
 knowledge-base ports alone. Verify these new ports are free before deploying.
 
-The example pins a concrete MinIO image for reproducibility; `VOICE_MINIO_IMAGE` can select your
-organization's maintained S3-compatible distribution. AWS S3 or existing S3 can be used by configuring
-endpoints and credentials and removing the sample `s3`/`storage-init` services from an override. The
-core requires multipart, presigned GET/PUT, HEAD, list and delete operations.
+The single-node example uses **PGSTY Silo**, an independently maintained MinIO community fork under
+AGPL-3.0-or-later. It requires no AIStor activation file. Production and integration-test Compose
+both pin `pgsty/silo:RELEASE.2026-09-03T13-18-01Z`, the latest stable release verified on 2026-09-08.
+The pulled multi-platform manifest digest matches the
+[upstream release](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-03T13-18-01Z):
+`sha256:b616a0cf8cb281e7e6bb3c9b1fb53875b4016a2878223925541c18f82d6c5ca3`.
+RAGFlow also uses this maintenance line, but currently pins an older release; that is adoption
+evidence, not proof that Silo is the most widely used distribution or that our application works.
+Our checks are recorded separately in the rehearsal runbook. Recheck release notes, provenance and
+compatibility before changing `VOICE_MINIO_IMAGE`; do not use a floating `latest` tag for deployment.
+
+AIStor is a separate licensed product, not a prerequisite for this configuration. No activation
+variable or license overlay is required. Existing assets and database migrations remain intact.
+
+AWS S3 or an existing S3 service remains an architectural option requiring its own Compose override
+and acceptance. The core requires multipart, presigned GET/PUT, HEAD, list and delete operations.
 
 From the project root:
 
 ```bash
 cp .env.example .env
-# Edit the three credentials, source URL, provider and bind address as needed.
+# Edit credentials, source URL, provider and bind address.
+# PowerShell: Copy-Item .env.example .env (only if .env does not already exist).
 docker compose --env-file .env -f deploy/compose.yaml config --quiet
 docker compose --env-file .env -f deploy/compose.yaml up -d --build
-docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api worker
 curl http://127.0.0.1:18080/v1/health/ready
 ```
 

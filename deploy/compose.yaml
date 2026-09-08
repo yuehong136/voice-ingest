@@ -4,7 +4,7 @@ x-runtime: &runtime
   build:
     context: ..
     dockerfile: deploy/Dockerfile
-  env_file: ../.env
+  env_file: ${VOICE_ENV_FILE:-../.env}
   environment:
     VOICE_DATABASE_URL: postgresql+asyncpg://voice:${VOICE_DB_PASSWORD:?set VOICE_DB_PASSWORD}@postgres:5432/voice
     VOICE_S3_ENDPOINT: http://s3:9000
@@ -20,6 +20,7 @@ services:
     volumes: [postgres-data:/var/lib/postgresql/data]
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U voice -d voice"]
+      start_period: 120s
       interval: 5s
       timeout: 5s
       retries: 20
@@ -27,12 +28,15 @@ services:
     networks: [voice]
 
   s3:
-    image: ${VOICE_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-06-13T11-33-47Z}
+    image: ${VOICE_MINIO_IMAGE:-pgsty/silo:RELEASE.2026-09-03T13-18-01Z}
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: ${VOICE_S3_ACCESS_KEY:?set VOICE_S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${VOICE_S3_SECRET_KEY:?set VOICE_S3_SECRET_KEY}
-    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:19000:9000"]
+      MINIO_API_CORS_ALLOW_ORIGIN: ${VOICE_WEB_ORIGIN:-http://127.0.0.1:18081}
+      MINIO_API_STALE_UPLOADS_EXPIRY: 24h
+      MINIO_API_STALE_UPLOADS_CLEANUP_INTERVAL: 6h
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:${VOICE_S3_PORT:-19000}:9000"]
     volumes: [s3-data:/data]
     restart: unless-stopped
     networks: [voice]
@@ -45,12 +49,12 @@ services:
 
   storage-init:
     <<: *runtime
-    command: python deploy/init_storage.py
+    command: python deploy/init_storage.py --cleanup minio
     depends_on: [s3]
 
   api:
     <<: *runtime
-    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:18080:18080"]
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:${VOICE_API_PORT:-18080}:18080"]
     command: voice-ingest-server
     depends_on:
       migrate: {condition: service_completed_successfully}

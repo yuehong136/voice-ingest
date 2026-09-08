@@ -109,3 +109,54 @@ MP3 为默认格式，22050 Hz 为默认采样率；单次文本发送最多 200
 MD5 在此只作为 S3 请求完整性字段，制品身份和恢复校验仍使用 SHA-256。
 此发现进一步说明真实数据库/对象存储测试不能被内存替身替代。测试使用历史 MinIO 镜像验证兼容性，
 不把该镜像当成新生产部署版本推荐；生产对象存储版本需按当前官方维护和许可证情况单独选择。
+
+## 发布审查补充：MinIO multipart 清理（2026-09-08）
+
+正式 Compose 启动暴露 `AbortIncompleteMultipartUpload` lifecycle 被拒绝，原脚本导致 storage-init 失败。
+[官方问题记录](https://github.com/minio/minio/issues/19115)说明该动作不适用于 MinIO；
+[本次镜像版本对应源码](https://github.com/minio/minio/blob/RELEASE.2025-06-13T11-33-47Z/internal/config/api/api.go)
+定义 `MINIO_API_STALE_UPLOADS_EXPIRY` 和 `MINIO_API_STALE_UPLOADS_CLEANUP_INTERVAL`。
+采用明确区分的 bootstrap 策略：Compose 的 MinIO 使用服务端扫描；通用 S3 使用标准 lifecycle 并保留已有规则。
+源码参数核验和初始化策略单元测试不等于已在最新 AIStor 上初始化成功或等待 24 小时验证物理回收。
+上述旧镜像仍只作为本轮本地兼容演练配置，
+正式托管版本和维护情况必须单独选择，见[部署演练](../operations/deployment-rehearsal.md)。
+
+同日进一步核实[官方高危公告](https://github.com/minio/minio/security/advisories/GHSA-hv4r-mvr4-25vw)：
+旧社区版受 unsigned-trailer 签名绕过影响，社区仓库于 2026-04-25 归档；公告修复指向 AIStor，
+不能将旧社区镜像视为持续维护的生产默认。采用结论更新为：历史镜像仅保留在隔离兼容验证中；
+曾暂选 AIStor 单节点免费版；下文最终社区选型已取代该临时决定，保留核验事实以免混淆产品线。
+
+2026-09-08 查询[官方发布接口](https://dl.min.io/api/releases/aistor/latest)，
+返回镜像 `quay.io/minio/aistor/minio:RELEASE.2026-08-07T18-34-35Z`，元数据发布时间
+`2026-08-07T22:20:29Z`；镜像内 `--version` 核验 commit
+`59a3350e61d019f9ba2fcd37c44ac038639d35cf`、Go 1.26.5 / linux/amd64。
+[发布制品说明](https://docs.min.io/aistor/operations/release-artifacts/)用于后续重新查询，
+部署固定本次具体 tag，不使用会静默漂移的 latest 标签。
+[许可说明](https://docs.min.io/aistor/operations/licenses/)确认 Free 需有效许可证、支持单节点且不含 SLA；
+无许可证可离线启动，但所有 S3 操作被阻止。免费版不是旧 AGPL 社区版；
+这一限制只适用于 AIStor，不能推导为所有 MinIO 社区分支都需要激活。
+
+## 最终社区对象存储选型（2026-09-08）
+
+用户明确要求采用持续维护的社区最新版本；不为尚未对外使用的系统引入旧客户端兼容层，
+但已有资产、迁移及真实验收记录仍保留。最终选择 PGSTY Silo，替代临时 AIStor 配置。
+
+| 项目快照 | 实际镜像 | 判断 |
+| --- | --- | --- |
+| [RAGFlow main](https://github.com/infiniflow/ragflow/blob/main/docker/docker-compose-base.yml) | pgsty/silo:RELEASE.2026-08-06T00-00-00Z | 同一维护线的采用证据，不能推导为使用量第一 |
+| [RAGFlow v0.26.4](https://github.com/infiniflow/ragflow/blob/v0.26.4/docker/docker-compose-base.yml) | pgsty/minio:RELEASE.2026-03-25T00-00-00Z | 更名前的历史发行版，不作为本项目默认 |
+| [Langfuse main](https://github.com/langfuse/langfuse/blob/main/docker-compose.yml) | cgr.dev/chainguard/minio | 第三方构建、无固定 tag；无法由 Compose 确定其准确版本 |
+| [Milvus master standalone](https://github.com/milvus-io/milvus/blob/master/deployments/docker/standalone/docker-compose.yml) | minio/minio:RELEASE.2024-05-28T17-19-04Z | 示例保留旧版，不等于当前安全推荐 |
+
+[Silo 项目](https://github.com/pgsty/silo)是独立维护的 MinIO 分支，2026-08-06 从 pgsty/minio 更名，
+采用 AGPL-3.0-or-later，无 AIStor 激活文件要求，与 MinIO 公司无隶属关系。
+本项目直接采用[最新稳定版 RELEASE.2026-09-03T13-18-01Z](https://github.com/pgsty/silo/releases/tag/RELEASE.2026-09-03T13-18-01Z)，
+源码 `9b11dc9469e650815b775cb47b039610644f5da4`，镜像 `pgsty/silo:RELEASE.2026-09-03T13-18-01Z`。
+实际拉取 manifest 摘要与上游一致：`sha256:b616a0cf8cb281e7e6bb3c9b1fb53875b4016a2878223925541c18f82d6c5ca3`。
+本次核对了发布页与镜像摘要，没有声称已独立验证所有签名或整个依赖树的安全性。
+
+该发行版重点改进 bucket CORS、multipart 校验和与权限一致性；上游报告自身集群恢复测试通过。
+我们必须另行验证 Voice Ingest 的签名上传/下载、删除、CORS、初始化、迁移和成对备份恢复，
+不能拿上游测试报告替代本项目证据。[固定源码配置](https://github.com/pgsty/silo/blob/9b11dc9469e650815b775cb47b039610644f5da4/internal/config/api/api.go)
+保留 MINIO_API_CORS_ALLOW_ORIGIN 和 stale-upload 参数；实际 24 小时孤立分片回收尚需长期观察。
+AIStor 仅保留为后续可选部署方向，本轮不要求其许可证，也不交付 AIStor 已验证的声明。

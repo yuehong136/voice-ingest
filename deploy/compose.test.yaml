@@ -4,6 +4,8 @@ x-source: &source
   - ../src:/app/src:ro
   - ../tests:/app/tests:ro
   - ../migrations:/app/migrations:ro
+  - ../deploy/storage_snapshot.py:/app/deploy/storage_snapshot.py:ro
+  - ../deploy/init_storage.py:/app/deploy/init_storage.py:ro
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,7 +19,7 @@ services:
       timeout: 3s
       retries: 30
   s3:
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    image: pgsty/silo:RELEASE.2026-09-03T13-18-01Z
     command: server /data
     ports: ["127.0.0.1:19039:9000"]
     environment:
@@ -26,7 +28,7 @@ services:
       MINIO_API_CORS_ALLOW_ORIGIN: http://127.0.0.1:5174
   browser:
     image: voice-ingest-phase1-tests-tests
-    command: ["uv", "run", "python", "tests/browser_backend.py"]
+    command: ["uv", "run", "--no-sync", "python", "tests/browser_backend.py"]
     profiles: [browser]
     volumes: *source
     ports: ["127.0.0.1:18089:18080"]

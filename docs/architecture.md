@@ -52,8 +52,10 @@ the client never supplies a trusted completion manifest. Completed upload IDs ca
 
 Completion reserves a five-minute operation lease. A retry after a process failure can recover a
 finished object by its expected key and metadata. A concurrent completion/abort receives `upload_busy`.
-Incomplete uploads expire after 24 hours. S3 lifecycle rules also abort unknown orphan multipart
-sessions caused by a crash between opening an S3 session and saving its ID. The worker streams the
+Incomplete uploads expire after 24 hours. Unknown orphan multipart sessions require storage-side
+cleanup: S3 lifecycle on AWS-compatible implementations, or MinIO server stale-upload scanning
+(24-hour expiry threshold, six-hour scan interval in Compose). MinIO does not support the S3
+AbortIncompleteMultipartUpload lifecycle action. The worker streams the
 completed object to a temporary file, verifies its SHA-256, and runs ffprobe before any paid request.
 Temporary audio is removed on normal completion/cancellation; container restart discards its tmp space.
 
@@ -146,6 +148,8 @@ credentials, external signed-URL access or ASR quality.
 
 Use Alembic migrations; never create tables at API startup. Back up PostgreSQL and object data as one
 logical dataset. The initial migration is frozen. New schema changes require new revision files.
+The [deployment rehearsal runbook](operations/deployment-rehearsal.md) documents offline snapshots,
+empty-target restore, release evidence and remaining operational limits.
 Revisit durable external workflow engines only if task volume or multi-step workflows justify them.
 
 Official integration references (verified 2026-09-05):

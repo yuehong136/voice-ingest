@@ -1,0 +1,16 @@
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!src
+!src/**
+!migrations
+!migrations/**
+!alembic.ini
+!deploy
+!deploy/Dockerfile
+!deploy/init_storage.py
+!deploy/storage_snapshot.py
+**/__pycache__
+**/*.pyc

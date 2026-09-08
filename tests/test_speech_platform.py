@@ -5,6 +5,7 @@ import io
 import json
 import wave
 from dataclasses import replace
+from datetime import timedelta
 
 import httpx
 import pytest
@@ -136,6 +137,56 @@ async def test_local_mcp_synthesis_uses_public_sdk(env, tmp_path):
         assert metadata.structured_content["audio_path"] == f"/v1/syntheses/{job_id}/audio"
 
 
+@pytest.mark.parametrize("kind", ["transcription", "synthesis"])
+async def test_deleted_tasks_cannot_be_retried_or_recreated(env, asset, kind, monkeypatch):
+    service = env.transcriptions if kind == "transcription" else env.syntheses
+    request = (
+        CreateTranscription(asset_id=asset)
+        if kind == "transcription"
+        else CreateSynthesis(text="deletion fixture", options=options())
+    )
+    created = await service.create(request, "deletion-tombstone")
+    assert (await advance(env, created.id, service)).state == "succeeded"
+    original_delete = env.storage.delete_prefix
+
+    async def unavailable(prefix):
+        raise DomainError("storage_unavailable", "Synthetic storage failure", 503, True)
+
+    monkeypatch.setattr(env.storage, "delete_prefix", unavailable)
+    with pytest.raises(DomainError, match="Synthetic storage failure"):
+        await service.delete(created.id)
+    for acknowledgement in (False, True):
+        with pytest.raises(DomainError, match="Deleted tasks cannot be retried"):
+            await service.retry(created.id, acknowledgement)
+    repeated = await service.create(request, "deletion-tombstone")
+    assert repeated.id == created.id and repeated.attempt == 1
+    assert repeated.error.code == "result_deleted"
+    assert await env.worker.claim() is None
+    monkeypatch.setattr(env.storage, "delete_prefix", original_delete)
+    await service.delete(created.id)
+    await service.delete(created.id)
+    assert not env.storage.internal.list_objects_v2(
+        Bucket=env.storage.bucket, Prefix=f"results/{created.id}/"
+    ).get("Contents")
+
+
+async def test_delete_waits_for_worker_and_fences_expired_owner(env):
+    created = await env.syntheses.create(
+        CreateSynthesis(text="lease deletion", options=options()), "lease-delete"
+    )
+    claimed = await env.worker.claim()
+    await env.worker.checkpoint(claimed, "failed")
+    with pytest.raises(DomainError, match="active worker lease"):
+        await env.syntheses.delete(created.id)
+    async with env.sessions.begin() as session:
+        await session.execute(
+            update(Job).where(Job.id == created.id).values(lease_until=now() - timedelta(seconds=1))
+        )
+    await env.syntheses.delete(created.id)
+    with pytest.raises(LeaseLost):
+        await env.worker.checkpoint(claimed, "succeeded", result_key="stale-result")
+
+
 async def test_completed_receipt_survives_lost_checkpoint_without_inference(env, monkeypatch):
     adapter = env.worker.registry.deployments["default"].adapter
     original_start = adapter.start
@@ -222,6 +273,36 @@ async def test_storage_marker_failure_recovers_complete_objects(env, monkeypatch
     )
     assert (await advance(env, created.id)).state == "succeeded"
     assert calls == 1 and failed
+
+
+async def test_retry_receipt_inspection_racing_with_delete_is_read_only(env, monkeypatch):
+    created = await env.syntheses.create(
+        CreateSynthesis(text="read-only recovery", options=options()), "inspect-delete"
+    )
+    assert (await advance(env, created.id)).state == "succeeded"
+    async with env.sessions.begin() as session:
+        job = await session.get(Job, created.id)
+        job.state = "failed"
+        capture_key = job.capture_key
+    await env.storage.delete(capture_key)
+    original = env.storage.read_bytes
+    raced = False
+
+    async def read_then_delete(key, limit):
+        nonlocal raced
+        data = await original(key, limit)
+        if key.endswith("/audio") and not raced:
+            raced = True
+            await env.syntheses.delete(created.id)
+        return data
+
+    monkeypatch.setattr(env.storage, "read_bytes", read_then_delete)
+    with pytest.raises(DomainError):
+        await env.syntheses.retry(created.id)
+    assert raced
+    assert not env.storage.internal.list_objects_v2(
+        Bucket=env.storage.bucket, Prefix=f"results/{created.id}/"
+    ).get("Contents")
 
 
 @pytest.mark.parametrize("audio", [None, b"", b"truncated"])

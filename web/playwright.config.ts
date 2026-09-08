@@ -6,15 +6,17 @@ export default defineConfig({
   reporter: 'list',
   timeout: 30000,
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: process.env.VOICE_WEB_TEST_BASE_URL || 'http://127.0.0.1:5174',
     trace: 'off',
     screenshot: 'only-on-failure',
     ...devices['Desktop Chrome'],
     channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
   },
-  webServer: {
-    command: 'npm run test:serve',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: false,
-  },
+  webServer: process.env.VOICE_WEB_TEST_BASE_URL
+    ? undefined
+    : {
+        command: 'npm run test:serve',
+        url: 'http://127.0.0.1:5174',
+        reuseExistingServer: false,
+      },
 })

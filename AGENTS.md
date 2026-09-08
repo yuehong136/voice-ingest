@@ -10,4 +10,5 @@
 - Never log credentials, signed URLs, transcript text or user request bodies. Never commit .env or recordings.
 - Do not modify existing remote knowledge-base deployments. All deployment examples use independent resources.
 - Run `make check` and relevant tests. Integration tests use only dedicated test resources; real ASR is opt-in and paid.
+- For releases and data recovery read `docs/operations/deployment-rehearsal.md`; snapshots require stopped writers and restores require a separate empty target.
 - Keep contract changes and recovery semantics documented and covered by behavior tests.

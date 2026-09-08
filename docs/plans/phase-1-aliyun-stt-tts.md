@@ -187,6 +187,9 @@ uv run python scripts/accept_aliyun.py --config .local/acceptance.env --allow-pa
 
 ## 个人 skill 与交接
 
+第一阶段之后的发布审查和独立部署进展单独记录在 [部署演练](../operations/deployment-rehearsal.md)，
+不覆盖上述真实阿里验收历史，也不将本地 mock 演练写成公网厂商验收。
+
 个人 skill：C:\Users\duxiaolong\.codex\skills\voice-platform-development\SKILL.md。
 项目 docs 是权威正文，skill references 是同名参考副本，快照与同步索引位于 skill 的 references/index.md。
 相关文档变化后同步对应副本并核对 SHA-256。换电脑的接手者无需个人 skill 即可沿 docs 完整接手。

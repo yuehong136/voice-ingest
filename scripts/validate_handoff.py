@@ -11,6 +11,7 @@ DOCUMENTS = [
     ROOT / "docs/references/voice-ai-open-source-research.md",
     ROOT / "docs/design/voice-platform-v1.md",
     ROOT / "docs/plans/phase-1-aliyun-stt-tts.md",
+    ROOT / "docs/operations/deployment-rehearsal.md",
 ]
 
 
@@ -19,7 +20,12 @@ def main():
     parser.add_argument("--skill-dir", type=Path)
     parser.add_argument("--sync", action="store_true")
     args = parser.parse_args()
-    for document in [*DOCUMENTS, ROOT / "AGENTS.md", ROOT / "docs/architecture.md"]:
+    for document in [
+        *DOCUMENTS,
+        ROOT / "AGENTS.md",
+        ROOT / "docs/architecture.md",
+        ROOT / "docs/deployment.md",
+    ]:
         for target in re.findall(r"\]\(([^)]+)\)", document.read_text(encoding="utf-8")):
             if re.match(r"(?:https?://|#|[A-Za-z]:)", target):
                 continue

@@ -177,6 +177,24 @@ async def test_deleted_results_stay_unavailable(env, asset):
     assert not response.get("Contents")
 
 
+async def test_export_racing_with_delete_cannot_recreate_objects(env, asset, monkeypatch):
+    job = await env.transcriptions.create(CreateTranscription(asset_id=asset), "export-delete")
+    await finish(env, job.id)
+    original = env.transcriptions.result
+
+    async def read_then_delete(job_id):
+        result = await original(job_id)
+        await env.transcriptions.delete(job_id)
+        return result
+
+    monkeypatch.setattr(env.transcriptions, "result", read_then_delete)
+    # The already-authorized in-flight reader may finish, but cannot repopulate storage.
+    assert await env.transcriptions.export(job.id, "markdown")
+    assert not env.storage.internal.list_objects_v2(
+        Bucket=env.storage.bucket, Prefix=f"results/{job.id}/"
+    ).get("Contents")
+
+
 async def test_source_staging_retries_before_billable_submission(env, asset):
     class Source:
         calls = 0

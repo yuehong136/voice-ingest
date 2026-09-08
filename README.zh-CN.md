@@ -63,6 +63,9 @@ curl --fail http://127.0.0.1:18080/v1/health/ready
 
 命令启动独立的 API、worker、PostgreSQL 和 MinIO。默认本地端口为 **18080**（API）和 **19000**（S3），不占用 80/443。
 
+对象存储使用 **PGSTY Silo 社区维护分支**，固定为 `RELEASE.2026-09-03T13-18-01Z`，
+无需 AIStor 激活许可证。版本来源与当前验收状态见[部署文档](docs/deployment.md)。
+
 默认供应商为 `mock`，输出带 `[MOCK]` 标记，不会识别录音正文。初始化完成后，健康检查应返回 HTTP 200。
 
 ### 2. 提交录音

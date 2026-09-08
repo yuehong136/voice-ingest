@@ -89,6 +89,53 @@ test('synthesis requires explicit submission, plays complete audio and supports 
   await page.screenshot({ path: 'test-results/synthesis-mobile.png', fullPage: true })
 })
 
+for (const deleted of [false, true]) {
+  test(`synthesis retry respects ${deleted ? 'deletion tombstones' : 'duplicate-charge consent'}`, async ({
+    page,
+  }) => {
+    const job = {
+      id: 'guarded-tts',
+      state: deleted ? 'failed' : 'needs_attention',
+      remote_may_run: !deleted,
+      error: { code: deleted ? 'result_deleted' : 'submission_unknown', message: 'Test state' },
+      options: { model: 'mock-tts', voice: 'mock-voice' },
+      attempt: 1,
+    }
+    let acknowledged = false
+    await page.route('**/api/**', (route) => {
+      const path = new URL(route.request().url()).pathname
+      if (path.endsWith('/models'))
+        return route.fulfill({ json: [{ id: 'mock-tts', kind: 'synthesis', provider: 'mock' }] })
+      if (path.endsWith('/voices')) return route.fulfill({ json: [] })
+      if (path.endsWith('/syntheses')) return route.fulfill({ json: { items: [job] } })
+      if (path.endsWith('/guarded-tts')) return route.fulfill({ json: job })
+      if (path.endsWith('/retry')) {
+        acknowledged = route.request().postDataJSON().acknowledge_duplicate_risk
+        return route.fulfill({ json: { ...job, state: 'queued' } })
+      }
+      return route.fulfill({ json: { items: [] } })
+    })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
+    await page.getByLabel('Workspace access key').fill('browser-test-key')
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Connect workspace', exact: true })
+      .click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Speech synthesis', exact: true }).click()
+    await page.locator('.synthesis-row').first().click()
+    const retry = page.getByRole('button', { name: 'Retry / recover', exact: true })
+    await expect(retry).toBeDisabled()
+    if (!deleted) {
+      await page.getByRole('checkbox').check()
+      await expect(retry).toBeEnabled()
+      await retry.click()
+      await expect.poll(() => acknowledged).toBe(true)
+    }
+  })
+}
+
 test('real browser completes synthesis against isolated PostgreSQL and S3', async ({ page }) => {
   test.skip(!process.env.VOICE_WEB_TEST_KEY, 'Dedicated mock backend required')
   test.setTimeout(120000)
@@ -108,6 +155,10 @@ test('real browser completes synthesis against isolated PostgreSQL and S3', asyn
   await expect
     .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.duration))
     .toBe(1)
+  await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.play())
+  await expect
+    .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime))
+    .toBeGreaterThan(0)
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download audio', exact: true }).click()
   expect((await downloading).suggestedFilename()).toBe('speech.wav')

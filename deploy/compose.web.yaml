@@ -3,7 +3,7 @@ services:
     build:
       context: ../web
       dockerfile: Dockerfile
-    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:18081:8080"]
+    ports: ["${VOICE_BIND_ADDRESS:-127.0.0.1}:${VOICE_WEB_PORT:-18081}:8080"]
     depends_on:
       api: {condition: service_healthy}
     restart: unless-stopped

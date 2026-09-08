@@ -10,6 +10,9 @@
 !migrations/**
 !tests/
 !tests/**
+!deploy/
+!deploy/storage_snapshot.py
+!deploy/init_storage.py
 **/__pycache__
 **/*.wav
 **/*.mp3

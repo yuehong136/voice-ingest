@@ -1,4 +1,4 @@
-from voice_ingest.exports.render import CONTENT_TYPES, render
+from voice_ingest.exports.render import render
 from voice_ingest.jobs.service import JobService
 from voice_ingest.transcription.contracts import (
     DomainError,
@@ -57,10 +57,5 @@ class TranscriptionService(JobService[JobView, JobPage]):
 
     async def export(self, job_id: str, format: ExportFormat) -> bytes:
         transcript = await self.result(job_id)
-        body = render(transcript, format)
-        async with self.sessions() as session:
-            job = await self._load(session, job_id)
-        await self.storage.put(
-            f"results/{job.id}/{job.attempt}/export.{format}", body, CONTENT_TYPES[format]
-        )
-        return body
+        # Render on demand: concurrent deletion must not recreate private export objects.
+        return render(transcript, format)

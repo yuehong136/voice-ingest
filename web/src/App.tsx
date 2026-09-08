@@ -845,6 +845,7 @@ export default function App() {
                                   className="secondary"
                                   disabled={
                                     action.isPending ||
+                                    job.error?.code === 'result_deleted' ||
                                     ((job.remote_may_run || job.state === 'needs_attention') &&
                                       !risk)
                                   }

@@ -32,7 +32,7 @@ from voice_ingest.runtime.database import Asset, Job, now, uid
 from voice_ingest.runtime.deployments import create_registry
 from voice_ingest.runtime.settings import Settings
 from voice_ingest.synthesis.service import SynthesisService
-from voice_ingest.transcription.contracts import CreateTranscription
+from voice_ingest.transcription.contracts import CreateTranscription, DomainError
 from voice_ingest.transcription.service import TranscriptionService
 
 pytestmark = pytest.mark.integration
@@ -253,3 +253,9 @@ async def test_synthesis_real_postgres_s3_and_decoder(real_env):
     assert metadata.duration_ms == 1000
     assert metadata.size == len(audio)
     assert metadata.sha256 == hashlib.sha256(audio).hexdigest()
+    await env.syntheses.delete(created.id)
+    with pytest.raises(DomainError, match="Deleted tasks cannot be retried"):
+        await env.syntheses.retry(created.id, acknowledge_duplicate_risk=True)
+    assert not env.storage.internal.list_objects_v2(
+        Bucket=env.storage.bucket, Prefix=f"results/{created.id}/"
+    ).get("Contents")
