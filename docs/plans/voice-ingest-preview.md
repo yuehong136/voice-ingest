@@ -1,6 +1,6 @@
 # Voice Ingest preview release checklist
 
-The preview helps people try a self-hosted transcription service and use an interview clip checklist in the editor they already know. Its three entry paths are watching an example, using subtitles with a Skill, and transcribing a recording or reading an existing task. The bilingual [example](../examples/clip-checklist.md) and [homepages](../../README.md) explain how to choose a path.
+The preview helps people try a self-hosted transcription service and use an interview clip checklist in the editor they already know. Its three entry paths are watching an example, using subtitles with a Skill, and transcribing a recording or reading an existing task. The bilingual [example](../examples/clip-checklist.md) and [homepages](../../README.md) explain how to choose a path. The [preview research](../references/voice-ingest-preview.md) records what changed since the local pilot.
 
 ## Prepare the release candidate
 
@@ -19,6 +19,26 @@ python3 scripts/build_clip_skill.py dist/voice-ingest-clip-checklist.zip
 python3 scripts/check_clip_skill_package.py dist/voice-ingest-clip-checklist.zip
 ```
 
+Generate the two synthetic source files with FFmpeg and the CPU voice generator in a separate environment. The first run downloads the pinned snapshots. Repeat with `--offline` once cached. The model packages are only needed to rebuild the examples.
+
+```bash
+uv run --isolated --no-project --python 3.12 \
+  --with 'kittenml==0.9.8' \
+  --with 'https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl' \
+  python scripts/generate_clip_demo_media.py .local/preview-media --cache-dir .local/preview-models
+uv run --no-sync python scripts/build_clip_demo.py .local/preview-media .local/preview-recording
+```
+
+Open the page served on loopback from `.local/preview-recording` and record selecting and playing the quote from both versions. The browser capture is visual. Add the matching sections of the generated audio at each playback start. Build the final assets with the recorded MP4 and the checked-out commit. The standalone browser check uses Chrome and runs with its network disabled.
+
+```bash
+uv run --no-sync python scripts/build_clip_demo.py .local/preview-media dist \
+  --walkthrough .local/preview-recording/clip-checklist-demo.mp4 \
+  --source-sha "$(git rev-parse HEAD)"
+npm ci --prefix web
+node web/scripts/check-clip-demo.mjs dist/clip-demo.html
+```
+
 ## Compatibility evidence
 
 Record results by operation for the exact release files. For an inclusive out point, inspect the final included frame separately from the end boundary in the checklist. Where a cut tool offers lossless mode, verify the first rendered frame as well as the selected in point.
@@ -26,7 +46,7 @@ Record results by operation for the exact release files. For an inclusive out po
 | Editor and input | Locate by checklist | Import SRT | Build selection automatically | Render and check |
 | --- | --- | --- | --- | --- |
 | Shotcut 26.11.15, local pilot 24 fps original and 5-second trim | Verified in Round 2 | Unverified | Unverified | Verified the manually marked pilot ranges in Round 2 |
-| Shotcut, preview release files | Record candidate result | Unverified | Unverified | Record candidate result |
+| Shotcut 26.11.15, synthetic preview sources at 24 fps | Checked the media and reused the Round 2 source selections. New manual timing remains unverified. | Unverified | Unverified | Verified both 66-frame selections with Shotcut's bundled renderer and checked the decoded audio against the corresponding source. |
 | Tester's preferred editor | Record during trial | Unverified | Unverified | Unverified |
 
 Use the trial to choose whether to verify another editor or an optional selection import. For any SRT-to-selection test use an export of the actual selected candidates. Keep the original whole transcript SRT available separately.

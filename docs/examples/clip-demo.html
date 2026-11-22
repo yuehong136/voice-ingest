@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Voice Ingest · Interview clip checklist</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light;
+        font: 16px/1.5 system-ui, sans-serif;
+        background: #f6f7f4;
+        color: #202e29;
+        --ink: #20352e;
+        --muted: #4c6158;
+        --line: #d8e1d9;
+        --accent: #bfead1;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body { margin: 0; }
+      main, header { width: min(100% - 3rem, 1080px); margin-inline: auto; }
+      header {
+        display: flex; align-items: center; justify-content: space-between;
+        min-height: 4.15rem; border-bottom: 1px solid var(--line);
+      }
+      header strong { font-size: 1.1rem; letter-spacing: -.045em; }
+      .lang { border: 0; background: transparent; color: #245840; padding: .4rem .6rem; }
+      main { padding-block: 2.5rem 3rem; }
+      h1, h2, p, blockquote { margin: 0; }
+      h1 { line-height: 1.06; font-size: clamp(2.1rem, 5vw, 3.2rem); letter-spacing: -.055em; }
+      .intro { max-width: 47ch; margin: .8rem 0 1.7rem; color: var(--muted); }
+      .columns { display: grid; grid-template-columns: 1fr .92fr; gap: 1rem; }
+      section { border-radius: 1rem; padding: 1.35rem; min-width: 0; }
+      .media { background: #fff; border: 1px solid var(--line); }
+      .candidate { background: var(--ink); color: #f0fcf5; }
+      h2 { font-size: 1rem; font-weight: 650; margin-bottom: .85rem; }
+      button, a { font: inherit; color: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, a:focus-visible, audio:focus-visible, video:focus-visible {
+        outline: 3px solid #008358; outline-offset: 3px;
+      }
+      .versions { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+      .versions button {
+        border: 1px solid var(--line); border-radius: .6rem; background: #f7f9f7;
+        min-width: 0; padding: .5rem .55rem; text-align: left; font-size: .9rem;
+      }
+      .versions [aria-pressed="true"] { background: #e3f4ea; color: #173e2c; border-color: #639b7e; }
+      .filename { margin: .9rem 0 .55rem; font: .85rem/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }
+      .track {
+        height: .55rem; border-radius: .5rem; background: #e8eee8;
+        position: relative; overflow: hidden;
+      }
+      .range, .cursor { position: absolute; top: 0; height: 100%; }
+      .range { background: #6cb792; }
+      .cursor { width: 2px; background: #1d4a34; }
+      .ticks { display: flex; justify-content: space-between; margin: .4rem 0 .55rem; font-size: .77rem; color: var(--muted); }
+      audio { width: 100%; height: 2.5rem; }
+      .download { display: flex; flex-wrap: wrap; gap: .6rem 1.15rem; margin-top: .55rem; font-size: .9rem; color: #245840; }
+      .stamps { font: 1rem/1.45 ui-monospace, monospace; color: var(--accent); margin-bottom: .75rem; }
+      blockquote { font-size: clamp(1.2rem, 3vw, 1.65rem); font-weight: 650; line-height: 1.22; letter-spacing: -.02em; }
+      .why { margin-top: .9rem; color: #d5e5dd; font-size: .88rem; }
+      .why b { display: block; color: #fff; font-size: .78rem; margin-bottom: .15rem; }
+      .candidate button {
+        border: 0; border-radius: .5rem; background: var(--accent); color: #173c2b;
+        padding: .48rem .75rem; margin-top: .9rem; font-weight: 650;
+      }
+      .status { color: #c7ddd1; font-size: .84rem; min-height: 1.25rem; margin-top: .35rem; }
+      .status[data-state="playing"] { color: #5effb3; }
+      .below { display: grid; gap: 1rem; margin-top: 1rem; }
+      .notes { color: var(--muted); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .9rem; }
+      .video { background: #fff; border: 1px solid var(--line); }
+      video { display: block; width: 100%; border-radius: .6rem; background: #192c25; }
+      @media (max-width: 680px) {
+        main, header { width: min(100% - 1.5rem, 1080px); }
+        main { padding-block: 1.5rem; }
+        .columns { grid-template-columns: 1fr; }
+        section { padding: 1.1rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Voice Ingest</strong>
+      <button type="button" class="lang" id="lang" lang="zh-CN" aria-label="切换到中文">中文</button>
+    </header>
+    <main>
+      <h1 data-copy="title">Interview clip checklist</h1>
+      <p class="intro" data-copy="intro">Compare the same quote in two versions of a synthetic interview.</p>
+      <div class="columns">
+        <section class="media" aria-labelledby="media-title">
+          <h2 id="media-title" data-copy="source">Source media</h2>
+          <div class="versions" role="group" aria-labelledby="media-title">
+            <button type="button" id="original" data-copy="original" aria-pressed="true">Original · 16 s</button>
+            <button type="button" id="trimmed" data-copy="trimmed" aria-pressed="false">Trimmed 5 s · 11 s</button>
+          </div>
+          <p class="filename" id="filename"></p>
+          <div class="track" aria-hidden="true"><span class="range"></span><span class="cursor"></span></div>
+          <div class="ticks"><span>00:00</span><span id="runtime"></span></div>
+          <audio id="audio" controls preload="metadata" aria-labelledby="filename"></audio>
+          <div class="download">
+            <a id="media-download" data-copy="downloadMedia">Download source</a>
+            <a id="srt-download" data-copy="downloadSrt">Download SRT</a>
+          </div>
+        </section>
+        <section class="candidate" aria-labelledby="candidate-title">
+          <h2 id="candidate-title" data-copy="candidate">Recommended clip</h2>
+          <p class="stamps" id="range"></p>
+          <blockquote lang="en" id="quote"></blockquote>
+          <p class="why"><b data-copy="reason">Why this clip</b><span data-copy="reasonText">The before-and-after numbers make the result concrete.</span></p>
+          <button type="button" id="play" data-copy="play">Play this quote</button>
+          <p class="status" role="status"></p>
+        </section>
+      </div>
+      <div class="below">
+        <div class="notes">
+          <span data-copy="clock">Times start at the beginning of the selected file.</span>
+          <a id="checklist-download" data-copy="downloadChecklist">Download the full checklist</a>
+        </div>
+        <section class="video" id="walkthrough" aria-labelledby="video-title" hidden>
+          <h2 id="video-title" data-copy="walkthrough">Recorded walkthrough</h2>
+          <video id="video" controls preload="none" aria-labelledby="video-title"></video>
+        </section>
+      </div>
+    </main>
+    <script id="fixtures" type="application/json">@@FIXTURES@@</script>
+    <script>
+      const data = JSON.parse(document.querySelector('#fixtures').textContent)
+      const byId = (id) => document.getElementById(id)
+      const audio = byId('audio')
+      const status = document.querySelector('.status')
+      const words = {
+        en: {
+          title: 'Interview clip checklist', intro: 'Compare the same quote in two versions of a synthetic interview.',
+          source: 'Source media', original: 'Original · 16 s', trimmed: 'Trimmed 5 s · 11 s',
+          downloadMedia: 'Download source', downloadSrt: 'Download SRT', candidate: 'Recommended clip',
+          reason: 'Why this clip', reasonText: 'The before-and-after numbers make the result concrete.',
+          play: 'Play this quote', clock: 'Times start at the beginning of the selected file.',
+          downloadChecklist: 'Download the full checklist', walkthrough: 'Recorded walkthrough',
+          playing: 'Playing the selected quote', finished: 'End of selected quote',
+          paused: 'Selected quote paused',
+          failed: 'Playback unavailable. Download the source to review it in your editor.',
+        },
+        zh: {
+          title: '采访剪辑清单', intro: '在两版合成采访素材里核对同一句原话。', source: '源素材',
+          original: '原版 · 16 秒', trimmed: '裁首 5 秒 · 11 秒', downloadMedia: '下载源素材',
+          downloadSrt: '下载 SRT', candidate: '推荐片段', reason: '选段理由',
+          reasonText: '用前后的数字交代了改善幅度。', play: '播放这段原话',
+          clock: '时间码从所选素材文件的开头起算。', downloadChecklist: '下载完整剪辑清单',
+          walkthrough: '操作录屏', playing: '正在播放所选原话', finished: '所选片段播放结束',
+          paused: '所选原话已暂停',
+          failed: '无法播放。可以下载源素材，在自己的编辑器里核对。',
+        },
+      }
+      let language = 'en'
+      let current = data.original
+      let stopAt = null
+      let statusKey = ''
+      let playback = 0
+      let animation
+      const text = (key) => words[language][key]
+      function showStatus(key) {
+        statusKey = key
+        status.textContent = key ? text(key) : ''
+        status.dataset.state = key
+      }
+      function link(id, href, filename) {
+        const link = byId(id)
+        link.href = href
+        link.download = filename
+      }
+      function setLanguage(value) {
+        language = value === 'zh' ? 'zh' : 'en'
+        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en'
+        document.title = `Voice Ingest · ${text('title')}`
+        for (const node of document.querySelectorAll('[data-copy]')) node.textContent = text(node.dataset.copy)
+        byId('lang').textContent = language === 'en' ? '中文' : 'English'
+        byId('lang').lang = language === 'en' ? 'zh-CN' : 'en'
+        byId('lang').setAttribute('aria-label', language === 'en' ? '切换到中文' : 'Switch to English')
+        showStatus(statusKey)
+      }
+      function updateCursor() {
+        document.querySelector('.cursor').style.left = `${Math.min(100, (audio.currentTime / current.duration) * 100)}%`
+        if (stopAt !== null && audio.currentTime >= stopAt) {
+          stopAt = null
+          audio.pause()
+          showStatus('finished')
+        }
+      }
+      function clock() {
+        updateCursor()
+        if (!audio.paused) animation = requestAnimationFrame(clock)
+      }
+      function select(key) {
+        playback++
+        stopAt = null
+        audio.pause()
+        current = data[key]
+        audio.src = current.media
+        for (const id of ['original', 'trimmed']) byId(id).setAttribute('aria-pressed', id === key)
+        byId('filename').textContent = current.file
+        byId('runtime').textContent = `00:${current.duration}`
+        byId('range').textContent = `${current.cue.start} – ${current.cue.end}`
+        byId('quote').textContent = current.cue.quote
+        const range = document.querySelector('.range')
+        range.style.left = `${(current.start / current.duration) * 100}%`
+        range.style.width = `${((current.end - current.start) / current.duration) * 100}%`
+        link('media-download', current.media, current.file)
+        link('srt-download', current.srt, current.file.replace('.mp4', '.srt'))
+        showStatus('')
+        updateCursor()
+      }
+      byId('lang').addEventListener('click', () => setLanguage(language === 'en' ? 'zh' : 'en'))
+      for (const key of ['original', 'trimmed']) byId(key).addEventListener('click', () => select(key))
+      byId('play').addEventListener('click', async () => {
+        const attempt = ++playback
+        try {
+          audio.currentTime = current.start
+          stopAt = current.end
+          await audio.play()
+          if (attempt === playback) showStatus('playing')
+        } catch {
+          if (attempt === playback) {
+            stopAt = null
+            showStatus('failed')
+          }
+        }
+      })
+      audio.addEventListener('timeupdate', updateCursor)
+      audio.addEventListener('play', () => { cancelAnimationFrame(animation); clock() })
+      audio.addEventListener('pause', () => {
+        cancelAnimationFrame(animation)
+        if (stopAt !== null) showStatus('paused')
+      })
+      link('checklist-download', data.checklist, 'example-checklist.md')
+      if (data.walkthrough) {
+        byId('video').src = data.walkthrough
+        byId('walkthrough').hidden = false
+      }
+      select('original')
+    </script>
+  </body>
+</html>
