@@ -8,13 +8,13 @@ Use a checklist to find an exact quote in your editor. Each entry identifies the
 
 Open the finished checklist and the matching subtitles. To save either SRT from the GitHub file view, select **Raw** and save it as `.srt`. Both versions contain “We lowered the review time from nine hours to four.” Seek to `00:00:07,000` on the original, or `00:00:02,000` on the trim. [Checklist](../../skills/voice-ingest-clip-checklist/assets/example-checklist.md) · [Original SRT](../../skills/voice-ingest-clip-checklist/assets/interview-original.srt) · [Trimmed SRT](../../skills/voice-ingest-clip-checklist/assets/interview-trim-5s.srt)
 
-Once a preview is published, its [GitHub release](https://github.com/yuehong136/voice-ingest/releases) lists the standalone `clip-demo.html`, the short `clip-checklist-demo.mp4` demonstration, and `voice-ingest-clip-demo.zip`. Open the HTML in a browser, or extract the ZIP for separate media, subtitles, and checklist. The video demonstrates locating and playing the line in the paired sample. It uses synthetic speech.
+Download and open the HTML in your browser, watch the short recording, or extract the ZIP for separate media, subtitles, and checklist. Both media versions use synthetic speech. [Offline example](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/clip-demo.html) · [Recording](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/clip-checklist-demo.mp4) · [Example ZIP](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/voice-ingest-clip-demo.zip)
 
 To verify the line in your editor, load the named file and set the time display to source time. The checklist's out is the end boundary. In Shotcut at 24 fps, the last included frame comes immediately before this boundary. Use the position, quote, and source version together when checking the cut.
 
 ## Use an SRT you already have
 
-1. Load the [clip checklist Skill](../../skills/voice-ingest-clip-checklist/SKILL.md) in your agent client using its local Skill setup. When published, the matching release provides `voice-ingest-clip-checklist.zip`. Extract it and follow the client's installation instructions.
+1. Download and extract the ZIP, then use your client's local Skill setup to load the [clip checklist Skill](../../skills/voice-ingest-clip-checklist/SKILL.md). [Skill ZIP](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/voice-ingest-clip-checklist.zip)
 2. Explicitly provide the SRT and the media filename/version or sequence name/revision it came from. Say whether the timestamps are media time or sequence time. If the client cannot read the file, use an approved attachment or paste the complete cue blocks. Use the [plain-text example](../../skills/voice-ingest-clip-checklist/assets/paste-example.md) to try this route.
 3. Ask for exact quotes with both endpoints and a separate reason for each candidate. Seek to at least one quote in your own editor before using the cuts.
 

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-- **[看采访剪辑示例](docs/examples/clip-checklist.zh-CN.md)**。直接打开配套字幕与清单，或用手头已有的 SRT 体验 Skill。
+- **[看采访剪辑示例](docs/examples/clip-checklist.zh-CN.md)**。播放两版合成采访中的同一句原话，或用手头已有的 SRT 体验 Skill。[下载预览版](https://github.com/yuehong136/voice-ingest/releases/tag/v0.1.0-alpha.1)
 - **[自托管并接入 Agent](#快速开始)**。先跑本地 mock 流程，按需配置真实转写，已有任务可按 ID 继续读取。
 
 ![Voice Ingest 中文示例工作台：录音列表、说话人分段、原始时间戳、正文搜索与导出](docs/assets/screenshots/workspace-zh-CN.png)

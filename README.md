@@ -7,7 +7,7 @@ Self-hosted audio transcription for people and agents, with resumable uploads, d
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-- **[See the interview clip example](docs/examples/clip-checklist.md).** Open the matching subtitles and checklist, or try the Skill with an SRT you already have.
+- **[See the interview clip example](docs/examples/clip-checklist.md).** Play the same quote in two versions of a synthetic interview, or try the Skill with an SRT you already have. [Download the preview](https://github.com/yuehong136/voice-ingest/releases/tag/v0.1.0-alpha.1)
 - **[Self-host and connect an agent](#quickstart).** Run the mock workflow locally, configure real transcription when needed, or continue an existing job by ID.
 
 ![Voice Ingest sample workspace showing recordings, speaker-labeled transcript segments, timestamps, search, and export controls](docs/assets/screenshots/workspace-en.png)

@@ -8,13 +8,13 @@
 
 打开成品清单及配套字幕。在 GitHub 文件页选择 **Raw**，可另存为 `.srt`。同一句 “We lowered the review time from nine hours to four.” 在原版从 `00:00:07,000` 开始，在裁首版从 `00:00:02,000` 开始。[成品清单](../../skills/voice-ingest-clip-checklist/assets/example-checklist.md) · [原版 SRT](../../skills/voice-ingest-clip-checklist/assets/interview-original.srt) · [裁首五秒版 SRT](../../skills/voice-ingest-clip-checklist/assets/interview-trim-5s.srt)
 
-预览发布后，可在 [GitHub Releases](https://github.com/yuehong136/voice-ingest/releases) 找到独立页面 `clip-demo.html`、短录屏 `clip-checklist-demo.mp4` 和 `voice-ingest-clip-demo.zip`。在浏览器打开 HTML，也可解压 ZIP 单独查看素材、字幕和清单。录屏演示如何定位并播放对应原话，示例用合成语音制作。
+下载 HTML 后在浏览器打开，也可以直接看短录屏，或解压 ZIP 分别打开素材、字幕和清单。两版素材均使用合成语音。[离线示例](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/clip-demo.html) · [录屏](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/clip-checklist-demo.mp4) · [素材 ZIP](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/voice-ingest-clip-demo.zip)
 
 在剪辑器中打开清单对应的素材，把时间显示切到源素材时间。清单的出点表示结束边界。用 24 fps 的 Shotcut 标记时，结束边界的前一帧是最后一帧。使用前同时核对版本、位置和原话。
 
 ## 使用手头已有的 SRT
 
-1. 按客户端的本地 Skill 安装方式加载[采访剪辑清单 Skill](../../skills/voice-ingest-clip-checklist/SKILL.md)。预览发布后，也可从对应 Release 下载并解压 `voice-ingest-clip-checklist.zip`。
+1. 下载并解压 ZIP，按客户端的本地 Skill 安装方式加载[采访剪辑清单 Skill](../../skills/voice-ingest-clip-checklist/SKILL.md)。[Skill ZIP](https://github.com/yuehong136/voice-ingest/releases/download/v0.1.0-alpha.1/voice-ingest-clip-checklist.zip)
 2. 显式提供 SRT，并注明导出时使用的媒体文件名与版本，或序列名称与版本。说明时间从媒体起算，还是从序列起算。客户端不能读文件时，可用获准的附件方式或粘贴完整 cue。可直接使用[纯文本示例](../../skills/voice-ingest-clip-checklist/assets/paste-example.md)试跑。
 3. 要求逐字引用、保留完整起止时间、单列选段理由。使用清单前，先在自己的剪辑器中核对至少一条。
 
