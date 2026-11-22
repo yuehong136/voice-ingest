@@ -1,0 +1,7 @@
+1
+00:00:02,000 --> 00:00:04,750
+We lowered the review time from nine hours to four.
+
+2
+00:00:07,000 --> 00:00:09,750
+Next, we checked it against the original.

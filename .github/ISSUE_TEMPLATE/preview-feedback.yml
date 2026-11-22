@@ -1,0 +1,47 @@
+name: Preview feedback / 预览反馈
+description: Report a reproducible problem with the Voice Ingest preview or clip checklist.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. Use synthetic inputs and replace names, identifiers, paths, and hostnames with placeholders. Keep recordings, transcript/subtitle text, keys, signed URLs, and deployment details out of this report.
+
+        Issue 公开可见。请用合成素材重现，并把名称、标识、路径和主机名替换为占位符。请勿提交录音、转录或字幕正文、密钥、签名 URL 和部署详情。
+  - type: input
+    id: version
+    attributes:
+      label: Preview tag or commit / 预览标签或提交
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry path / 使用入口
+      options:
+        - Synthetic demo / 合成样例
+        - Existing SRT or pasted subtitle cues / 已有 SRT 或粘贴字幕
+        - Web upload or transcription / 网页上传或转写
+        - Existing job via an agent or MCP / Agent 或 MCP 接续已有任务
+        - CLI or SDK / 命令行或 SDK
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: OS, agent or browser, editor version, frame rate, and media or sequence time base when applicable.
+      placeholder: macOS, Shotcut 26.11.15, 24 fps, source time
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction / 最小复现
+      description: Describe the actions, expected and observed behavior, and any sanitized error code.
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Public report / 公开内容检查
+      options:
+        - label: I removed private material and credentials. / 我已移除私有素材和凭据。
+          required: true

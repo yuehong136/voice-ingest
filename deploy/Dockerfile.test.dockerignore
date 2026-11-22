@@ -10,6 +10,11 @@
 !migrations/**
 !tests/
 !tests/**
+!skills/
+!skills/**
+!scripts/
+!scripts/build_clip_skill.py
+!scripts/check_clip_skill_package.py
 !deploy/
 !deploy/storage_snapshot.py
 !deploy/init_storage.py

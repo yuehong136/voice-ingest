@@ -1,0 +1,372 @@
+{
+  "model": "gpt-6.1-terra",
+  "cli_version": "codex-cli 0.171.0-alpha.13",
+  "fixture_sha256": "616163772e65700df7b1579450221387dd32c4646b17b18a8de4d481d42acefd",
+  "skill_sha256": "e6435b7158ea7f3702fcb913b40859e0e290130048cec89ce604fba851cf2059",
+  "results": [
+    {
+      "case": "bilingual-sequence",
+      "condition": "with_skill",
+      "elapsed_ms": 9705,
+      "usage": {
+        "input_tokens": 12856,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 220,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "8",
+            "start_ms": 3602002,
+            "end_ms": 3603003,
+            "quote": "更正：复核后的读数是 4,9 度。",
+            "reason": "明确给出复核后的最终读数，并纠正早期读数。"
+          },
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "9",
+            "start_ms": 3604004,
+            "end_ms": 3605005,
+            "quote": "We confirmed it on the independent probe.",
+            "reason": "说明使用独立探头进行复核。"
+          },
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "10",
+            "start_ms": 3606006,
+            "end_ms": 3607007,
+            "quote": "只测了一个点位，不能代表整个河段。",
+            "reason": "交代样本仅覆盖一个点位，避免将结果推广到整个河段。"
+          }
+        ],
+        "needs_verification": []
+      },
+      "hard_pass": true,
+      "hard_failures": [],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 3,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    },
+    {
+      "case": "bilingual-sequence",
+      "condition": "without_skill",
+      "elapsed_ms": 9471,
+      "usage": {
+        "input_tokens": 11640,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 230,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "8",
+            "start_ms": 36002002,
+            "end_ms": 36003003,
+            "quote": "更正：复核后的读数是 4,9 度。",
+            "reason": "明确给出复核后的最终读数，并纠正早期的 9 度读数。"
+          },
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "9",
+            "start_ms": 36004004,
+            "end_ms": 36005005,
+            "quote": "We confirmed it on the independent probe.",
+            "reason": "说明读数通过独立探头确认，交代复核方式。"
+          },
+          {
+            "source": "河岸试验 sequence r3",
+            "timeline": "sequence",
+            "cue_id": "10",
+            "start_ms": 36006006,
+            "end_ms": 36007007,
+            "quote": "只测了一个点位，不能代表整个河段。",
+            "reason": "说明样本只有一个测量点，不能将结果推广到整个河段。"
+          }
+        ],
+        "needs_verification": []
+      },
+      "hard_pass": false,
+      "hard_failures": [
+        "candidates[1] cue 8: timestamps differ from input",
+        "candidates[2] cue 9: timestamps differ from input",
+        "candidates[3] cue 10: timestamps differ from input"
+      ],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 0,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    },
+    {
+      "case": "missing-timestamps",
+      "condition": "with_skill",
+      "elapsed_ms": 10455,
+      "usage": {
+        "input_tokens": 12852,
+        "cached_input_tokens": 9216,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 245,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "assembly-interview-source",
+            "timeline": "media",
+            "cue_id": "2",
+            "start_ms": 1250,
+            "end_ms": 4050,
+            "quote": "We reduced the handoff queue from twelve items to five.",
+            "reason": "States the change in the review handoff queue."
+          },
+          {
+            "source": "assembly-interview-source",
+            "timeline": "media",
+            "cue_id": "4",
+            "start_ms": 7100,
+            "end_ms": 9180,
+            "quote": "We compared every moved item with its original note.",
+            "reason": "Shows how the team checked items during the handoff."
+          },
+          {
+            "source": "assembly-interview-source",
+            "timeline": "media",
+            "cue_id": "5",
+            "start_ms": 9530,
+            "end_ms": 11050,
+            "quote": "We only did that for one team this week.",
+            "reason": "Provides context on the scope of the review."
+          }
+        ],
+        "needs_verification": [
+          {
+            "source": "assembly-interview-source",
+            "timeline": "media",
+            "cue_id": "3",
+            "start_ms": 4250,
+            "end_ms": null,
+            "quote": "Finance thinks this may also save 4,900 dollars.",
+            "reason": "The potential finance impact should be checked before cutting; the segment also lacks an end time."
+          }
+        ]
+      },
+      "hard_pass": true,
+      "hard_failures": [],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 3,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    },
+    {
+      "case": "missing-timestamps",
+      "condition": "without_skill",
+      "elapsed_ms": 9566,
+      "usage": {
+        "input_tokens": 16221,
+        "cached_input_tokens": 9216,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 238,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "assemblies-03.json",
+            "timeline": "media",
+            "cue_id": "2",
+            "start_ms": 1250,
+            "end_ms": 4050,
+            "quote": "We reduced the handoff queue from twelve items to five.",
+            "reason": "States the main handoff result."
+          },
+          {
+            "source": "assemblies-03.json",
+            "timeline": "media",
+            "cue_id": "4",
+            "start_ms": 7100,
+            "end_ms": 9180,
+            "quote": "We compared every moved item with its original note.",
+            "reason": "Describes the review process."
+          },
+          {
+            "source": "assemblies-03.json",
+            "timeline": "media",
+            "cue_id": "5",
+            "start_ms": 9530,
+            "end_ms": 11050,
+            "quote": "We only did that for one team this week.",
+            "reason": "Qualifies the scope of the review."
+          }
+        ],
+        "needs_verification": [
+          {
+            "source": "assemblies-03.json",
+            "timeline": "media",
+            "cue_id": "3",
+            "start_ms": 4250,
+            "end_ms": null,
+            "quote": "Finance thinks this may also save 4,900 dollars.",
+            "reason": "Check the estimated savings claim and determine the cue's missing end time before cutting."
+          }
+        ]
+      },
+      "hard_pass": false,
+      "hard_failures": [
+        "candidates[1] cue 2: wrong source or timebase",
+        "candidates[2] cue 4: wrong source or timebase",
+        "candidates[3] cue 5: wrong source or timebase",
+        "needs_verification[1] cue 3: wrong source or timebase",
+        "required verification rows missing for 3"
+      ],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 0,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    },
+    {
+      "case": "trimmed-media",
+      "condition": "with_skill",
+      "elapsed_ms": 9353,
+      "usage": {
+        "input_tokens": 13009,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 201,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "1",
+            "start_ms": 2000,
+            "end_ms": 4750,
+            "quote": "We lowered the review time from nine hours to four.",
+            "reason": "States the result with a clear before-and-after comparison."
+          },
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "2",
+            "start_ms": 6000,
+            "end_ms": 8000,
+            "quote": "We checked timestamps on all 24 review tickets.",
+            "reason": "Gives the evidence behind the result."
+          },
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "3",
+            "start_ms": 9000,
+            "end_ms": 12000,
+            "quote": "That's a one-week pilot, and we don't know whether it holds next month.",
+            "reason": "States the pilot's short duration and the uncertainty about whether the result will last."
+          }
+        ],
+        "needs_verification": []
+      },
+      "hard_pass": true,
+      "hard_failures": [],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 3,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    },
+    {
+      "case": "trimmed-media",
+      "condition": "without_skill",
+      "elapsed_ms": 8897,
+      "usage": {
+        "input_tokens": 16363,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 191,
+        "reasoning_output_tokens": 0
+      },
+      "response": {
+        "candidates": [
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "1",
+            "start_ms": 2000,
+            "end_ms": 4750,
+            "quote": "We lowered the review time from nine hours to four.",
+            "reason": "States the result."
+          },
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "2",
+            "start_ms": 6000,
+            "end_ms": 8000,
+            "quote": "We checked timestamps on all 24 review tickets.",
+            "reason": "Provides the evidence behind the result."
+          },
+          {
+            "source": "field-interview-v2.mp4",
+            "timeline": "media",
+            "cue_id": "3",
+            "start_ms": 9000,
+            "end_ms": 12000,
+            "quote": "That's a one-week pilot, and we don't know whether it holds next month.",
+            "reason": "States the pilot's duration and the limit on what can be concluded."
+          }
+        ],
+        "needs_verification": []
+      },
+      "hard_pass": true,
+      "hard_failures": [],
+      "checks": {
+        "candidates": 3,
+        "exact_quote_candidates": 3,
+        "exact_timecoded_candidates": 3,
+        "reference_beats_present": 3,
+        "reference_beats_total": 3,
+        "missing_context_cue_groups": [],
+        "duplicate_candidates": 0
+      }
+    }
+  ],
+  "checked_skill_zip_sha256": "b212510aff726987180c220aba62f6ab3b7b75102503544fd572ee076a5054f8",
+  "skill_input": "Same-SHA SKILL.md verified inside the release ZIP.",
+  "scorer_note": "Raw model output preserved. Editorial choice scored separately from provenance and time readiness.",
+  "run_date": "2026-11-22"
+}

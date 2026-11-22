@@ -1,15 +1,14 @@
 # Voice Ingest
 
-**把长录音变成可阅读、可检索、可继续使用的文字。**
-
-面向个人、开发者与 AI Agent 的自托管转写工作台。在网页上传，用终端批量处理，或让 MCP 客户端接续同一个持久化任务。
+面向个人与 AI Agent 的自托管音频转写服务，支持断点续传、持久化任务和带时间戳的导出。
 
 [English](README.md) · **简体中文**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-[体验工作台](#体验工作台) · [快速开始](#快速开始) · [Web 工作台](#web-工作台) · [MCP](#mcp) · [Python SDK](#python-sdk) · [CLI](#cli) · [部署指南](docs/deployment.md)
+- **[看采访剪辑示例](docs/examples/clip-checklist.zh-CN.md)**。播放两版合成采访中的同一句原话，或用手头已有的 SRT 体验 Skill。[下载预览版](https://github.com/yuehong136/voice-ingest/releases/tag/v0.1.0-alpha.1)
+- **[自托管并接入 Agent](#快速开始)**。先跑本地 mock 流程，按需配置真实转写，已有任务可按 ID 继续读取。
 
 ![Voice Ingest 中文示例工作台：录音列表、说话人分段、原始时间戳、正文搜索与导出](docs/assets/screenshots/workspace-zh-CN.png)
 
@@ -54,6 +53,8 @@ npm run dev
 
 ### 1. 启动后端
 
+首次安装时，从示例创建 `.env`。升级时保留已有的 `.env`。
+
 ```bash
 cp .env.example .env
 # 编辑 .env：更换服务 API Key、数据库密码和 S3 凭证。
@@ -80,13 +81,11 @@ uv run voice-ingest transcribe meeting.m4a --wait --format markdown
 
 将 `meeting.m4a` 替换为音频路径。`--wait` 轮询任务，成功后输出 Markdown；不加则立即返回任务 ID。中断等待不会取消后端任务。
 
-> **验证状态：** 第一阶段检查及本阶段阿里 STT/TTS 真实验收已于 2026-09-07 通过，包括 Worker 重启恢复、跨入口查询、浏览器播放下载及用户试听确认。证据和剩余质量/部署边界见[当前交接](docs/plans/phase-1-aliyun-stt-tts.md)；[历史录音验收](docs/acceptance.md)单独保留。独立验收不代表生产部署已验收。
+### 3. 让 Agent 接续任务
 
-第一阶段新增**语音合成**工作区：连接后端，选择模型、部署与音色，输入完整文本并明确提交，完成后播放和下载。
-阿里首个配置为 `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3；mock 部署输出 WAV 静音测试音频。
-CLI 使用 `voice-ingest syntheses --help`；SDK 使用 `synthesize()`、`get_synthesis()`、`synthesis_result()` 和 `synthesis_audio()`；
-远程和本地 MCP 提供音色查询及合成生命周期工具，均复用相同业务实现。
-已有数据库必须执行新增 `0002` 迁移，不重建数据库。后续接手请从[阶段文档](docs/plans/phase-1-aliyun-stt-tts.md)进入设计和完整调研。
+通过 [MCP](#连接远程客户端) 将客户端连接到同一个工作区。手头已有任务 ID 时，先查这个任务。在已连接的预览版工作区，点击「复制给 Agent」即可得到任务 ID 和[采访剪辑工作流](docs/examples/clip-checklist.zh-CN.md#使用录音或已有任务)指令。服务密钥填写在客户端配置中。
+
+> **验证状态：** 第一阶段检查及本阶段阿里 STT/TTS 真实验收已于 2026-09-07 通过，包括 Worker 重启恢复、跨入口查询、浏览器播放下载及用户试听确认。证据和剩余质量/部署边界见[当前交接](docs/plans/phase-1-aliyun-stt-tts.md)；[历史录音验收](docs/acceptance.md)单独保留。独立验收不代表生产部署已验收。
 
 ## 供应商与模型
 
@@ -114,13 +113,19 @@ VOICE_S3_PUBLIC_ENDPOINT=https://files.example.com
 
 **计费通道：** 当前适配常规 DashScope ASR，未接入 Token Plan / Coding Plan，也不会在计费通道间自动回退。`VOICE_API_KEY` 用于访问你的后端，`VOICE_ALIYUN_API_KEY` 用于后端调用阿里。详见[部署与凭证配置](docs/deployment.md)。
 
+## 语音合成
+
+连接后端后打开「语音合成」，选择部署与音色，输入完整文本并明确提交。生成后可播放或下载音频。阿里首个配置为 `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3。`mock-tts` / `mock-voice` 生成用于流程测试的静音 WAV。
+
+CLI 使用 `voice-ingest syntheses --help`，Python SDK 使用 `synthesize()`、`get_synthesis()`、`synthesis_result()` 和 `synthesis_audio()`。远程和本地 MCP 均提供 `submit_synthesis`、`list_voices` 及合成任务与结果工具。已有安装通过 `0002` 迁移更新当前数据库。部署选型、恢复与付费验收见[设计与验收记录](docs/plans/phase-1-aliyun-stt-tts.md)。
+
 ## Web 工作台
 
 可选的 [React 前端](web/README.md) 将录音与转写结果放在同一个中英文工作区中。使用[上方体验命令](#体验工作台)启动，再通过服务密钥连接已运行的后端。
 
 1. **上传并确认。** 上传文件后选择识别设置；上传完成会停在确认页，点击“开始转写”才会提交任务。
 2. **跟踪与阅读。** 按状态筛选任务，核对说话人分段与原始时间戳，搜索已加载的正文。
-3. **导出或交给 Agent。** 下载 Markdown、TXT、JSON、SRT 或 VTT；连接后可复制任务 ID，通过 MCP 或 SDK 继续处理。
+3. **导出或交给 Agent。** 下载 Markdown、TXT、JSON、SRT 或 VTT。字幕因缺少时码而导出失败时，改为下载 JSON。可复制任务 ID 供 MCP 或 SDK 接续，或点击「复制给 Agent」获得只读工作流指令。
 
 <details>
 <summary>查看移动端阅读界面</summary>
@@ -323,6 +328,7 @@ uv build
 
 | 文档 | 内容 |
 | --- | --- |
+| [采访剪辑清单](docs/examples/clip-checklist.zh-CN.md) | 示例产物、用 SRT 试用及按 ID 接续任务 |
 | [Web 工作台](web/README.md) | 浏览器配置、上传确认、存储 CORS 与前端检查（英文） |
 | [云端后端 + 本地录音](docs/examples/cloud-backend-local-files.zh-CN.md) | 包含客户端配置与导出的完整 MCP 实践 |
 | [部署指南](docs/deployment.md) | 配置、私有存储、HTTP/HTTPS、凭证与运维（英文） |
