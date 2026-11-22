@@ -37,6 +37,39 @@ async function connect(page: Page) {
     page.getByRole('button', { name: 'New transcription', exact: true }).first(),
   ).toBeEnabled()
 }
+
+function syntheticWav(seconds: number, audible: boolean) {
+  const samples = 16000 * seconds
+  const wav = Buffer.alloc(44 + samples * 2)
+  wav.write('RIFF')
+  wav.writeUInt32LE(wav.length - 8, 4)
+  wav.write('WAVEfmt ', 8)
+  wav.writeUInt32LE(16, 16)
+  wav.writeUInt16LE(1, 20)
+  wav.writeUInt16LE(1, 22)
+  wav.writeUInt32LE(16000, 24)
+  wav.writeUInt32LE(32000, 28)
+  wav.writeUInt16LE(2, 32)
+  wav.writeUInt16LE(16, 34)
+  wav.write('data', 36)
+  wav.writeUInt32LE(samples * 2, 40)
+  if (audible) {
+    for (let i = 0; i < samples; i++)
+      wav.writeInt16LE(Math.round(Math.sin(i / 16) * 1000), 44 + i * 2)
+  }
+  return wav
+}
+
+async function connectLiveMock(page: Page, key: string) {
+  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
+  await page.getByLabel('Workspace access key').fill(key)
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Connect workspace', exact: true })
+    .click()
+  await expect(page.locator('.live-banner')).toContainText('Mock provider')
+}
+
 test('demo supports search, exports, language switching and narrow screens', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Transcriptions', exact: true })).toBeVisible()
@@ -301,33 +334,13 @@ test('real browser uploads to private storage and downloads native SRT from a du
   test.skip(!process.env.VOICE_WEB_TEST_KEY, 'Opt in with a dedicated mock backend only')
   test.setTimeout(120000)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Connect backend', exact: true }).click()
-  await page.getByLabel('Workspace access key').fill(process.env.VOICE_WEB_TEST_KEY!)
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: 'Connect workspace', exact: true })
-    .click()
-  await expect(page.locator('.live-banner')).toContainText('Mock provider')
-  const samples = 16000 * 4
-  const wav = Buffer.alloc(44 + samples * 2)
-  wav.write('RIFF')
-  wav.writeUInt32LE(wav.length - 8, 4)
-  wav.write('WAVEfmt ', 8)
-  wav.writeUInt32LE(16, 16)
-  wav.writeUInt16LE(1, 20)
-  wav.writeUInt16LE(1, 22)
-  wav.writeUInt32LE(16000, 24)
-  wav.writeUInt32LE(32000, 28)
-  wav.writeUInt16LE(2, 32)
-  wav.writeUInt16LE(16, 34)
-  wav.write('data', 36)
-  wav.writeUInt32LE(samples * 2, 40)
-  for (let i = 0; i < samples; i++)
-    wav.writeInt16LE(Math.round(Math.sin(i / 16) * 1000), 44 + i * 2)
+  await connectLiveMock(page, process.env.VOICE_WEB_TEST_KEY!)
   await page.getByRole('button', { name: 'New transcription', exact: true }).first().click()
-  await page
-    .getByLabel('Choose audio')
-    .setInputFiles({ name: `browser-${Date.now()}.wav`, mimeType: 'audio/wav', buffer: wav })
+  await page.getByLabel('Choose audio').setInputFiles({
+    name: `browser-${Date.now()}.wav`,
+    mimeType: 'audio/wav',
+    buffer: syntheticWav(4, true),
+  })
   await page.getByRole('button', { name: 'Upload file', exact: true }).click()
   await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible({
     timeout: 30000,
@@ -344,4 +357,95 @@ test('real browser uploads to private storage and downloads native SRT from a du
     '1\n00:00:00,000 --> 00:00:01,000\n[MOCK] Synthetic segment 1; not speech recognition.',
   )
   await page.screenshot({ path: 'test-results/live-workspace.png', fullPage: true })
+})
+
+test('real multipart upload resumes after a failed part and a page reload', async ({ page }) => {
+  const key = process.env.VOICE_WEB_TEST_KEY
+  test.skip(!key, 'Opt in with a dedicated mock backend only')
+  test.setTimeout(120000)
+  const file = {
+    name: `interrupted-${Date.now()}.wav`,
+    mimeType: 'audio/wav',
+    buffer: syntheticWav(530, false),
+  }
+  const uploadedParts: number[] = []
+  const resumedParts: number[] = []
+  let resumed = false
+  let uploadsCreated = 0
+  let jobsCreated = 0
+  let acceptFirstPart!: () => void
+  const firstPartCommitted = new Promise<void>((resolve) => {
+    acceptFirstPart = resolve
+  })
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    const path = new URL(request.url()).pathname
+    if (path === '/api/v1/uploads') uploadsCreated++
+    if (path === '/api/v1/transcriptions') jobsCreated++
+  })
+  page.on('response', (response) => {
+    const url = new URL(response.url())
+    if (
+      response.request().method() === 'PUT' &&
+      response.ok() &&
+      url.searchParams.get('partNumber') === '1'
+    ) {
+      acceptFirstPart()
+    }
+  })
+  await page.route(
+    (url) => url.searchParams.has('partNumber') && url.searchParams.has('uploadId'),
+    async (route) => {
+      const request = route.request()
+      if (request.method() !== 'PUT') return route.continue()
+      expect(request.headers().authorization).toBeUndefined()
+      const part = Number(new URL(request.url()).searchParams.get('partNumber'))
+      if (resumed) resumedParts.push(part)
+      else uploadedParts.push(part)
+      if (!resumed && part === 2) {
+        await firstPartCommitted
+        return route.abort('failed')
+      }
+      return route.continue()
+    },
+  )
+  async function selectAudioAndUpload() {
+    await page.getByRole('button', { name: 'New transcription', exact: true }).first().click()
+    await page.getByLabel('Choose audio').setInputFiles(file)
+    await page.getByRole('button', { name: 'Upload file', exact: true }).click()
+  }
+  await page.goto('/')
+  await connectLiveMock(page, key!)
+  const initialUpload = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/uploads',
+  )
+  await selectAudioAndUpload()
+  const { id: uploadId } = await (await initialUpload).json()
+  await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible({ timeout: 30000 })
+  expect(uploadedParts.sort()).toEqual([1, 2])
+  expect(jobsCreated).toBe(0)
+
+  resumed = true
+  await page.reload()
+  await connectLiveMock(page, key!)
+  const recovered = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/uploads/${uploadId}`,
+  )
+  await selectAudioAndUpload()
+  const saved = await (await recovered).json()
+  expect(saved.state).toBe('uploading')
+  expect(saved.parts.map((part: { number: number }) => part.number)).toEqual([1])
+  await expect(page.getByText('File uploaded. Transcription has not started.')).toBeVisible({
+    timeout: 30000,
+  })
+  expect(resumedParts).toEqual([2])
+  expect(uploadsCreated).toBe(1)
+  expect(jobsCreated).toBe(0)
+  await page.getByRole('button', { name: 'Start transcription', exact: true }).click()
+  await expect(page.locator('.status-badge')).toHaveText('Ready', { timeout: 60000 })
+  expect(jobsCreated).toBe(1)
 })

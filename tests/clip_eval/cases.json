@@ -1,0 +1,79 @@
+[
+  {
+    "name": "trimmed-media",
+    "prompt": "I'm cutting field-interview-v2.mp4, the trimmed version. Pick up to three distinct beats for a 30-second piece about the result, evidence and limits. The old subtitles are included for reference. Use v2 media time.",
+    "target": "field-interview-v2.mp4",
+    "timeline": "media",
+    "inputs": [
+      {
+        "source": "field-interview-original.mp4",
+        "format": "srt",
+        "payload": "1\n00:00:02,000 --> 00:00:03,000\nThe room was quiet.\n\n2\n00:00:07,000 --> 00:00:09,750\nWe lowered the review time from nine hours to four.\n\n3\n00:00:11,000 --> 00:00:13,000\nWe checked timestamps on all 24 review tickets.\n\n4\n00:00:14,000 --> 00:00:17,000\nThat's a one-week pilot, and we don't know whether it holds next month.\n\n5\n00:00:18,000 --> 00:00:20,000\nIt took four hours instead of nine.\n"
+      },
+      {
+        "source": "field-interview-v2.mp4",
+        "format": "srt",
+        "payload": "1\n00:00:02,000 --> 00:00:04,750\nWe lowered the review time from nine hours to four.\n\n2\n00:00:06,000 --> 00:00:08,000\nWe checked timestamps on all 24 review tickets.\n\n3\n00:00:09,000 --> 00:00:12,000\nThat's a one-week pilot, and we don't know whether it holds next month.\n\n4\n00:00:13,000 --> 00:00:15,000\nIt took four hours instead of nine.\n\n5\n00:00:16,000 --> 00:00:17,000\nThanks for having me.\n"
+      }
+    ],
+    "beats": [
+      {"cues": ["1", "4"], "reason": "Concrete before and after result"},
+      {"cues": ["2"], "reason": "Independently checkable method"},
+      {"cues": ["3"], "reason": "Pilot duration and generalization caveat"}
+    ],
+    "context": [{"if": ["1", "4"], "include": ["3"]}],
+    "needs_verification": []
+  },
+  {
+    "name": "bilingual-sequence",
+    "prompt": "给《河岸试验》序列 r3 选至多三条剪辑候选，中文写推荐理由。讲清最终读数、怎么复核、样本的限制。字幕从序列的 01:00:00 起算，保留该序列时间。",
+    "target": "河岸试验 sequence r3",
+    "timeline": "sequence",
+    "inputs": [
+      {
+        "source": "河岸试验 sequence r3",
+        "format": "srt",
+        "payload": "7\n01:00:00,501 --> 01:00:01,001\n早期读数看起来是 9 度。\n\n8\n01:00:02,002 --> 01:00:03,003\n更正：复核后的读数是 4,9 度。\n\n9\n01:00:04,004 --> 01:00:05,005\nWe confirmed it on the independent probe.\n\n10\n01:00:06,006 --> 01:00:07,007\n只测了一个点位，不能代表整个河段。\n\n11\n01:00:08,008 --> 01:00:09,009\n是的，确认是 4,9 度。\n"
+      }
+    ],
+    "beats": [
+      {"cues": ["8"], "reason": "Explicit correction and exact decimal comma"},
+      {"cues": ["9"], "reason": "Independent method in English"},
+      {"cues": ["10"], "reason": "Sampling limit"}
+    ],
+    "context": [{"if": ["7", "11"], "include": ["8"]}],
+    "duplicates": [["8", "11"]],
+    "needs_verification": []
+  },
+  {
+    "name": "missing-timestamps",
+    "prompt": "From the Voice Ingest JSON export for job pilot-case-03, pick up to three clips about the review handoff. The finance claim could be important. Include it somewhere so we can check it before cutting.",
+    "target": "assembly-interview-source",
+    "timeline": "media",
+    "inputs": [
+      {
+        "source": "assemblies-03.json",
+        "format": "json",
+        "payload": {
+          "job_id": "pilot-case-03",
+          "asset_id": "assembly-interview-source",
+          "segments": [
+            {"text": "We reviewed the queue again on Tuesday.", "start_ms": 0, "end_ms": 1000},
+            {"text": "We reduced the handoff queue from twelve items to five.", "start_ms": 1250, "end_ms": 4050},
+            {"text": "Finance thinks this may also save 4,900 dollars.", "start_ms": 4250, "end_ms": null},
+            {"text": "We compared every moved item with its original note.", "start_ms": 7100, "end_ms": 9180},
+            {"text": "We only did that for one team this week.", "start_ms": 9530, "end_ms": 11050},
+            {"text": "So the queue was five, down from twelve.", "start_ms": 12100, "end_ms": 14020}
+          ]
+        }
+      }
+    ],
+    "beats": [
+      {"cues": ["2", "6"], "reason": "Exact before and after counts"},
+      {"cues": ["4"], "reason": "Audit method"},
+      {"cues": ["5"], "reason": "Scope limitation"}
+    ],
+    "context": [{"if": ["2", "6"], "include": ["5"]}],
+    "needs_verification": ["3"]
+  }
+]

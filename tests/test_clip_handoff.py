@@ -1,6 +1,8 @@
 import json
+import shutil
 import subprocess
 import sys
+from fractions import Fraction
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -184,3 +186,95 @@ def test_srt_reader_does_not_invent_timing(tmp_path, bounds):
     result = read_srt(source, "Source v1")
     assert result.returncode != 0 and not result.stdout
     assert "Cue 1" in result.stderr
+
+
+def ordinal_frame(stamp: str, origin_ms: int, fps: Fraction) -> int:
+    """Translate the millisecond-rounded boundary of a known frame into a frame index."""
+    hour, minute, second = stamp.replace(",", ":").split(":")[:3]
+    stamp_ms = ((int(hour) * 60 + int(minute)) * 60 + int(second)) * 1000
+    stamp_ms += int(stamp.rsplit(",", 1)[1])
+    frame = round(Fraction(stamp_ms - origin_ms, 1000) * fps)
+    assert abs(Fraction(frame * 1000, fps) - (stamp_ms - origin_ms)) <= Fraction(1, 2)
+    return frame
+
+
+def render_frame_range(clip: bytes, fps: Fraction, first: int, end: int) -> bytes:
+    return subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgb24",
+            "-video_size",
+            "2x2",
+            "-framerate",
+            str(fps),
+            "-i",
+            "pipe:0",
+            "-vf",
+            f"trim=start_frame={first}:end_frame={end}",
+            "-fps_mode",
+            "passthrough",
+            "-threads:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ],
+        input=clip,
+        capture_output=True,
+        check=True,
+    ).stdout
+
+
+def numbered_frames(count: int) -> list[bytes]:
+    return [bytes((i % 256, i // 256, 100)) * 4 for i in range(count)]
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="Frame rendering requires ffmpeg")
+def test_original_and_five_second_trim_render_the_same_66_source_frames():
+    fps = Fraction(24)
+    frames = numbered_frames(16 * 24)
+    original = b"".join(frames)
+    trimmed = render_frame_range(original, fps, 120, len(frames))
+    selected = []
+    for stem, cue_index, clip in (
+        ("interview-original", 1, original),
+        ("interview-trim-5s", 0, trimmed),
+    ):
+        path = SKILL / "assets" / f"{stem}.srt"
+        data = json.loads(read_srt(path, f"{stem}.mp4").stdout)
+        cue = data["cues"][cue_index]
+        assert data["source"] == f"{stem}.mp4"
+        first = ordinal_frame(cue["start"], 0, fps)
+        end = ordinal_frame(cue["end"], 0, fps)
+        selected.append(render_frame_range(clip, fps, first, end))
+    assert selected[0] == selected[1] == b"".join(frames[168:234])
+    assert render_frame_range(trimmed, fps, 168, 234) == b"".join(frames[288:354])
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="Frame rendering requires ffmpeg")
+def test_fractional_frame_rate_and_nonzero_sequence_origin_render_the_marked_frames(tmp_path):
+    srt = tmp_path / "sequence.srt"
+    srt.write_text(
+        "3\n01:00:00,501 --> 01:00:01,001\n复核 4,9 的读数。\n",
+        encoding="utf-8",
+    )
+    result = json.loads(read_srt(srt, "Sequence 03 export", "sequence").stdout)
+    assert result["timeline"] == "sequence"
+    cue = result["cues"][0]
+    assert (cue["start"], cue["end"], cue["quote"]) == (
+        "01:00:00,501",
+        "01:00:01,001",
+        "复核 4,9 的读数。",
+    )
+    fps = Fraction(30_000, 1001)
+    first = ordinal_frame(cue["start"], 3_600_000, fps)
+    end = ordinal_frame(cue["end"], 3_600_000, fps)
+    frames = numbered_frames(45)
+    assert (first, end) == (15, 30)
+    assert render_frame_range(b"".join(frames), fps, first, end) == b"".join(frames[15:30])
