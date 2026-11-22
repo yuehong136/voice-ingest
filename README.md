@@ -1,15 +1,14 @@
 # Voice Ingest
 
-**Turn long recordings into transcripts you can read, search, and build with.**
-
-A self-hosted transcription workspace for people, developers, and AI agents. Upload in your browser, automate from your terminal, or let an MCP client continue the same durable job.
+Self-hosted audio transcription for people and agents, with resumable uploads, durable jobs, and timestamped exports.
 
 **English** · [简体中文](README.zh-CN.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Checks](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml/badge.svg)](https://github.com/yuehong136/voice-ingest/actions/workflows/check.yml)
 
-[Try the UI](#try-the-workspace) · [Quickstart](#quickstart) · [Web workspace](#web-workspace) · [MCP](#mcp) · [Python SDK](#python-sdk) · [CLI](#cli) · [Deployment](docs/deployment.md)
+- **[See the interview clip example](docs/examples/clip-checklist.md).** Open the matching subtitles and checklist, or try the Skill with an SRT you already have.
+- **[Self-host and connect an agent](#quickstart).** Run the mock workflow locally, configure real transcription when needed, or continue an existing job by ID.
 
 ![Voice Ingest sample workspace showing recordings, speaker-labeled transcript segments, timestamps, search, and export controls](docs/assets/screenshots/workspace-en.png)
 
@@ -35,19 +34,6 @@ Voice Ingest handles the work around cloud ASR: resumable uploads, asynchronous 
 
 ## Try the workspace
 
-For phase-1 speech synthesis, connect the backend, open **Speech synthesis**, select a configured
-model/deployment and voice, then explicitly submit text. Completed files can be played and downloaded.
-Aliyun's first preset is `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3; mock deployments expose
-`mock-tts` / `mock-voice` / WAV. Mock audio is synthetic silence, not a quality demonstration.
-Use `voice-ingest syntheses --help` for CLI operations, or `AsyncVoiceClient.synthesize()` followed by
-`get_synthesis()`, `synthesis_result()` and `synthesis_audio()` in Python. Remote/local MCP include
-`submit_synthesis`, `list_voices` and synthesis lifecycle/result tools. All application endpoints,
-including remote MCP, health, metrics and OpenAPI, are under `/v1`.
-
-Existing installations must run incremental migration `0002`; do not recreate the database.
-[Development design and acceptance](docs/plans/phase-1-aliyun-stt-tts.md) describe setup, tests,
-deployment selection, recovery and the separate paid acceptance gate.
-
 Explore the interface before setting up infrastructure. You need **Node.js 24 LTS** (minimum 22.12):
 
 ```bash
@@ -66,6 +52,8 @@ From a local checkout, use **Docker Compose** for the backend and **Python 3.12 
 Run these commands from the repository root (`voice-ingest/`). If the frontend is running in another terminal, leave it running and open a new terminal at the root.
 
 ### 1. Start the backend
+
+For a new installation, create `.env` from the example. Keep your existing `.env` when upgrading.
 
 ```bash
 cp .env.example .env
@@ -93,6 +81,10 @@ uv run voice-ingest transcribe meeting.m4a --wait --format markdown
 ```
 
 Replace `meeting.m4a` with your audio file. `--wait` polls the job and prints Markdown when it succeeds. Omit it to return the job ID immediately; interrupting a wait does not cancel server-side work.
+
+### 3. Continue with an agent
+
+Connect your client to the same workspace using [MCP](#connect-a-remote-client). If you already have a job ID, start by looking up that job. In a connected preview workspace, **Copy for Agent** copies the ID and instructions for the [interview clip workflow](docs/examples/clip-checklist.md#use-a-recording-or-an-existing-job). Keep the service key in the client configuration.
 
 > **Validation status:** Phase-1 checks and real Aliyun STT/TTS acceptance passed on 2026-09-07, including worker restart recovery, cross-interface access, browser playback/download and user listening confirmation. See the [current handoff](docs/plans/phase-1-aliyun-stt-tts.md) for evidence and remaining quality/deployment limits. The [historical acceptance record](docs/acceptance.md) is preserved separately. Isolated acceptance does not establish production deployment readiness.
 
@@ -122,13 +114,19 @@ For local real-ASR evaluation without public S3, set `VOICE_ALIYUN_SOURCE_MODE=t
 
 **Billing:** This adapter uses regular DashScope ASR. Token Plan / Coding Plan is not integrated, and there is no automatic fallback between billing channels. `VOICE_API_KEY` protects your backend; `VOICE_ALIYUN_API_KEY` authenticates the backend to Aliyun. See [deployment and credential configuration](docs/deployment.md).
 
+## Speech synthesis
+
+Connect the backend, open **Speech synthesis**, select a configured deployment and voice, and explicitly submit text. Play or download the completed file. The first Aliyun preset is `qwen-audio-3.0-tts-flash` / `longanhuan_v3.6` / MP3. The `mock-tts` / `mock-voice` preset returns a silent WAV for workflow tests.
+
+Use `voice-ingest syntheses --help` or the Python SDK's `synthesize()`, `get_synthesis()`, `synthesis_result()` and `synthesis_audio()`. Both MCP transports expose `submit_synthesis`, `list_voices`, and the synthesis job and result tools. Existing installations use migration `0002` to add the speech framework to their current database. See the [design and acceptance record](docs/plans/phase-1-aliyun-stt-tts.md) for deployment selection, recovery and paid acceptance.
+
 ## Web workspace
 
 The optional [React frontend](web/README.md) brings recordings and transcripts into one English/Chinese workspace. Start it with the [preview commands above](#try-the-workspace), then connect to your running backend with its service key.
 
 1. **Upload and review.** Upload a file, then choose recognition settings. Uploading stops at a review step; **Start transcription** submits the job.
 2. **Follow and read.** Filter jobs by status, review speaker labels and original timestamps, and search loaded transcript text.
-3. **Export or continue with an agent.** Download Markdown, TXT, JSON, SRT, or VTT. Copy the job ID from a connected workspace for an MCP or SDK follow-up.
+3. **Export or continue with an agent.** Download Markdown, TXT, JSON, SRT, or VTT. If a subtitle export fails because timing is unavailable, download JSON. Copy the job ID for MCP or SDK follow-up, or use **Copy for Agent** for the read-only workflow instructions.
 
 <details>
 <summary>Mobile transcript reader</summary>
@@ -331,6 +329,7 @@ The v1 speech framework implements file STT and complete-file TTS for a shared, 
 
 | Document | Contents |
 | --- | --- |
+| [Interview clip checklist](docs/examples/clip-checklist.md) | Sample deliverables, SRT-only trial, and how to continue an existing job |
 | [Web workspace](web/README.md) | Browser setup, upload review, storage CORS, and frontend checks |
 | [Cloud backend + local recording](docs/examples/cloud-backend-local-files.md) | A complete MCP workflow with client configuration and exports |
 | [Deployment](docs/deployment.md) | Configuration, private storage, HTTP/HTTPS, credentials, operations |
