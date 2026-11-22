@@ -10,6 +10,7 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 COPY tests ./tests
 COPY skills ./skills
+COPY scripts/build_clip_skill.py scripts/check_clip_skill_package.py ./scripts/
 COPY deploy/storage_snapshot.py ./deploy/storage_snapshot.py
 COPY deploy/init_storage.py ./deploy/init_storage.py
 CMD ["uv", "run", "--no-sync", "pytest", "-q"]
