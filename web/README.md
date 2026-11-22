@@ -19,11 +19,11 @@ Open http://127.0.0.1:5174. Demo mode needs no backend or credentials. For actua
 - Service keys stay in memory. Reloading requires reconnecting. Audio and transcripts are never persisted by the frontend.
 - Upload and recognition are separate actions: **Upload file**, then review settings and **Start transcription**. Uploading alone never starts ASR.
 - **Transcribe later** keeps one pending file in this tab. Reopen **Continue setup** to submit, or select the displayed asset ID for an agent. After reloading, reconnect and re-select the same file to recover its completed upload; this is not a server-wide asset library.
-- Filter loaded jobs by processing, ready or attention status. Task details expose asset/job IDs and submission time; copy the job ID for MCP follow-up.
+- Filter loaded jobs by processing, ready or attention status. **Copy job ID** gives the ID alone. **Copy for Agent** adds instructions for a read-only handoff to the [clip checklist Skill](../skills/voice-ingest-clip-checklist/SKILL.md). If the browser cannot copy, select the text shown under the buttons.
 - A worker computes SHA-256 in 2 MiB chunks. Upload uses four concurrent 16 MiB parts and refreshes part signatures on rejected requests.
 - Re-select the same file to resume. Browser storage holds hashed workspace/file identity, upload IDs and submission idempotency keys. Disabling storage disables durable browser resume.
 - Cancel during upload pauses the client operation. Incomplete uploads expire according to backend policy. Submitted jobs survive closing the browser.
-- Live text is fetched in pages of 50 segments. Search applies to loaded text only. Exports retrieve the entire backend result.
+- Live text is fetched in pages of 50 segments. Search applies to loaded text only. Exports retrieve the entire backend result. If subtitle export requires missing timestamps, download JSON from the export message to keep the source text and existing timestamps.
 - Local playback is available for audio uploaded in the current tab; source download for older jobs is not exposed by the backend API.
 - This first web iteration handles one upload at a time; CLI batch workflows remain available.
 

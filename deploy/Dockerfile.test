@@ -9,6 +9,7 @@ RUN uv sync --frozen --all-extras
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY tests ./tests
+COPY skills ./skills
 COPY deploy/storage_snapshot.py ./deploy/storage_snapshot.py
 COPY deploy/init_storage.py ./deploy/init_storage.py
 CMD ["uv", "run", "--no-sync", "pytest", "-q"]

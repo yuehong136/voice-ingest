@@ -22,10 +22,10 @@ import {
   Unplug,
   CircleAlert,
   Code2,
-  Copy,
 } from 'lucide-react'
 import {
   Api,
+  ApiError,
   download,
   terminal,
   time,
@@ -39,6 +39,7 @@ import {
 import { demoAssets, demoJobs, demoModels, demoSegments } from './demo'
 import { labels } from './status'
 import { JobRow } from './recordings/JobRow'
+import { JobHandoff } from './recordings/JobHandoff'
 import { UploadModal, type UploadDraft } from './recordings/UploadModal'
 import { SynthesisWorkspace } from './synthesis/SynthesisWorkspace'
 import { Connection } from './connection/Connection'
@@ -155,7 +156,7 @@ export default function App() {
     },
   })
   const exporting = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ id, format }: { id: string; format: Format }) => {
       if (!api) {
         if (format === 'json')
           return new Blob([JSON.stringify({ demo: true, segments }, null, 2)], {
@@ -178,9 +179,9 @@ export default function App() {
             : segments.map((s) => s.text).join('\n\n')
         return new Blob([text], { type: 'text/plain;charset=utf-8' })
       }
-      return api.export(selected, format)
+      return api.export(id, format)
     },
-    onSuccess: (blob) => {
+    onSuccess: (blob, { format }) => {
       download(
         blob,
         `${api ? 'transcript' : 'sample-transcript'}.${format === 'markdown' ? 'md' : format}`,
@@ -188,6 +189,9 @@ export default function App() {
       setNotice(t('Export downloaded.', '导出已下载。'))
     },
   })
+  const exportError = exporting.variables?.id === selected ? exporting.error : null
+  const missingExportTimes =
+    exportError instanceof ApiError && exportError.code === 'timestamps_unavailable'
   const error =
     jobs.error ||
     jobQuery.error ||
@@ -195,7 +199,7 @@ export default function App() {
     asset.error ||
     transcript.error ||
     action.error ||
-    exporting.error
+    (missingExportTimes ? null : exportError)
   function switchConnection(next: Api | null) {
     setApi(next)
     setConnectionEpoch((value) => value + 1)
@@ -602,30 +606,7 @@ export default function App() {
                             {source ? `${(source.size / 1e6).toFixed(1)} MB` : '—'}
                           </p>
                           {api && (
-                            <button
-                              className="text-button job-reference"
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(job.id)
-                                  setNotice(
-                                    t(
-                                      'Job ID copied. Use it with your agent or SDK.',
-                                      '任务 ID 已复制，可交给 Agent 或 SDK 使用。',
-                                    ),
-                                  )
-                                } catch {
-                                  setNotice(
-                                    t(
-                                      'Copy unavailable. Select the job ID below.',
-                                      '无法自动复制，请选择下方任务 ID。',
-                                    ),
-                                  )
-                                }
-                              }}
-                            >
-                              <Copy size={13} />
-                              {t('Copy job ID', '复制任务 ID')}
-                            </button>
+                            <JobHandoff key={`${connectionEpoch}:${job.id}`} id={job.id} zh={zh} />
                           )}
                           {api && (
                             <details className="job-details">
@@ -663,13 +644,30 @@ export default function App() {
                           <button
                             className="secondary"
                             disabled={job.state !== 'succeeded' || exporting.isPending}
-                            onClick={() => exporting.mutate()}
+                            onClick={() => exporting.mutate({ id: job.id, format })}
                           >
                             <Download size={16} />
                             {t('Export', '导出')}
                           </button>
                         </div>
                       </div>
+                      {missingExportTimes && (
+                        <div className="callout export-fallback" role="alert">
+                          {t(
+                            'Some segments lack valid times. JSON preserves their text and any available times.',
+                            '部分句段缺少有效时间。JSON 会保留原话和已有时间。',
+                          )}
+                          <button
+                            className="text-button"
+                            onClick={() => {
+                              setFormat('json')
+                              exporting.mutate({ id: job.id, format: 'json' })
+                            }}
+                          >
+                            {t('Download JSON', '下载 JSON')}
+                          </button>
+                        </div>
+                      )}
                       <div className="audio-overview">
                         <div className="audio-label">
                           <AudioLines size={17} />

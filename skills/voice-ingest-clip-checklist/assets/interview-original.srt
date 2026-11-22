@@ -1,0 +1,11 @@
+1
+00:00:02,000 --> 00:00:04,750
+This is the setup, before the cut.
+
+2
+00:00:07,000 --> 00:00:09,750
+We lowered the review time from nine hours to four.
+
+3
+00:00:12,000 --> 00:00:14,750
+Next, we checked it against the original.

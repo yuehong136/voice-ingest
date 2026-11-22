@@ -1448,10 +1448,36 @@ dialog form > p {
   color: #37654f;
   margin-top: 6px;
 }
-.job-reference {
-  font-size: 11px;
+.job-handoff {
   margin-top: 12px;
-  color: var(--blue);
+  font-size: 11px;
+  color: var(--muted);
+}
+.job-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+}
+.job-handoff-actions button {
+  font-size: inherit;
+}
+.job-handoff textarea {
+  width: 100%;
+  margin-top: 5px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--ink);
+  resize: vertical;
+}
+.export-fallback {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 20px 14px;
 }
 .job-details {
   font-size: 11px;

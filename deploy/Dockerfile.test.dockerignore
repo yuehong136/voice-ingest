@@ -10,6 +10,8 @@
 !migrations/**
 !tests/
 !tests/**
+!skills/
+!skills/**
 !deploy/
 !deploy/storage_snapshot.py
 !deploy/init_storage.py

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 const model = {
   id: 'qwen-audio-3.0-asr-flash-filetrans',
   provider: 'mock',
@@ -72,6 +73,118 @@ test('auth errors are visible and service keys never persist', async ({ page }) 
   await expect(page.getByRole('alert')).toContainText('Workspace access key is incorrect')
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('browser-test-key')
 })
+
+for (const clipboard of ['available', 'unavailable', 'denied'] as const) {
+  test(`Agent handoff with clipboard ${clipboard}`, async ({ page, context }) => {
+    if (clipboard === 'available') {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    } else {
+      await page.addInitScript((mode) => {
+        Object.defineProperty(navigator, 'clipboard', {
+          value:
+            mode === 'denied'
+              ? { writeText: () => Promise.reject(new DOMException('Denied', 'NotAllowedError')) }
+              : undefined,
+        })
+      }, clipboard)
+    }
+    const other = { ...job, id: 'other-job-id', asset_id: 'other-asset-id' }
+    const writes: string[] = []
+    await page.route('**/api/**', (route) => {
+      const request = route.request()
+      const path = new URL(request.url()).pathname
+      if (request.method() !== 'GET') writes.push(path)
+      if (path.endsWith('/models')) return route.fulfill({ json: [model] })
+      if (path === '/api/v1/transcriptions') return route.fulfill({ json: { items: [other, job] } })
+      if (path.endsWith(`/assets/${asset.id}`)) return route.fulfill({ json: asset })
+      if (path.endsWith(`/assets/${other.asset_id}`)) {
+        return route.fulfill({ json: { ...asset, id: other.asset_id, filename: 'Other.wav' } })
+      }
+      if (path.endsWith('/segments')) {
+        return route.fulfill({
+          json: { segments: [{ text: 'Private words from the interview.' }] },
+        })
+      }
+      return route.fulfill({ json: path.endsWith(`/${other.id}`) ? other : job })
+    })
+    await page.goto('/')
+    await connect(page)
+    await page.getByRole('button', { name: /meeting\.wav/ }).click()
+    await expect(page.getByText('Private words from the interview.')).toBeVisible()
+    await page.setViewportSize({ width: 390, height: 844 })
+
+    await page.getByRole('button', { name: 'Copy job ID', exact: true }).click()
+    if (clipboard === 'available') {
+      await expect(page.getByText('Job ID copied.')).toBeVisible()
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(job.id)
+    } else {
+      await expect(page.getByRole('textbox', { name: 'Job ID to copy' })).toHaveValue(job.id)
+    }
+    await page.getByRole('button', { name: 'Copy for Agent', exact: true }).click()
+    let prompt: string
+    if (clipboard === 'available') {
+      await expect(page.getByText('Agent instructions copied.')).toBeVisible()
+      prompt = await page.evaluate(() => navigator.clipboard.readText())
+    } else {
+      const fallback = page.getByRole('textbox', { name: 'Agent instructions to copy' })
+      await expect(fallback).toBeVisible()
+      prompt = await fallback.inputValue()
+      await fallback.focus()
+      expect(await fallback.evaluate((box) => (box as HTMLTextAreaElement).selectionEnd)).toBe(
+        prompt.length,
+      )
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+    }
+    expect(prompt).toMatch(/^Job ID: j1\n\n/)
+    expect(prompt).toContain('get_transcription')
+    expect(prompt).toContain('next_cursor')
+    expect(prompt).toContain('JSON')
+    for (const privateValue of [other.id, asset.filename, 'Private words', 'browser-test-key']) {
+      expect(prompt).not.toContain(privateValue)
+    }
+    expect(prompt).not.toMatch(/https?:\/\//)
+    expect(writes).toEqual([])
+    await page.getByRole('button', { name: /Other\.wav/ }).click()
+    await expect(page.getByRole('textbox', { name: 'Agent instructions to copy' })).toHaveCount(0)
+  })
+}
+
+test('the subtitle error offers a downloadable JSON export for the same job', async ({ page }) => {
+  const fallback = {
+    job_id: job.id,
+    asset_id: asset.id,
+    segments: [{ text: 'Synthetic line.', start_ms: 900, end_ms: null, speaker_id: null }],
+  }
+  await page.route('**/api/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/models')) return route.fulfill({ json: [model] })
+    if (path === '/api/v1/transcriptions') return route.fulfill({ json: { items: [job] } })
+    if (path.endsWith(`/assets/${asset.id}`)) return route.fulfill({ json: asset })
+    if (path === `/api/v1/transcriptions/${job.id}`) return route.fulfill({ json: job })
+    if (path.endsWith('/segments')) return route.fulfill({ json: fallback })
+    if (path === `/api/v1/transcriptions/${job.id}/exports/srt`) {
+      return route.fulfill({ status: 409, json: { error: { code: 'timestamps_unavailable' } } })
+    }
+    if (path === `/api/v1/transcriptions/${job.id}/exports/json`) {
+      return route.fulfill({ json: fallback })
+    }
+    return route.fulfill({ status: 404 })
+  })
+  await page.goto('/')
+  await connect(page)
+  await page.getByRole('button', { name: /meeting\.wav/ }).click()
+  await page.getByLabel('Export format').selectOption('srt')
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Some segments lack valid times')
+  const exported = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download JSON' }).click()
+  const file = await exported
+  expect(file.suggestedFilename()).toBe('transcript.json')
+  expect(JSON.parse(await readFile(await file.path(), 'utf8'))).toEqual(fallback)
+})
+
 test('upload submits one idempotent job and does not forward credentials to storage', async ({
   page,
 }) => {
@@ -182,7 +295,9 @@ test('uncertain jobs require explicit duplicate-charge acknowledgement', async (
   await expect.poll(() => ack).toBe(true)
 })
 
-test('real browser uploads to private MinIO and observes a durable mock job', async ({ page }) => {
+test('real browser uploads to private storage and downloads native SRT from a durable mock job', async ({
+  page,
+}) => {
   test.skip(!process.env.VOICE_WEB_TEST_KEY, 'Opt in with a dedicated mock backend only')
   test.setTimeout(120000)
   await page.goto('/')
@@ -221,8 +336,12 @@ test('real browser uploads to private MinIO and observes a durable mock job', as
   await expect(page.locator('.status-badge')).toHaveText('Ready', { timeout: 60000 })
   await expect(page.locator('.segment').first()).toContainText('MOCK')
   const exported = page.waitForEvent('download')
-  await page.getByLabel('Export format').selectOption('json')
+  await page.getByLabel('Export format').selectOption('srt')
   await page.getByRole('button', { name: 'Export', exact: true }).click()
-  expect((await exported).suggestedFilename()).toBe('transcript.json')
+  const srt = await exported
+  expect(srt.suggestedFilename()).toBe('transcript.srt')
+  expect(await readFile(await srt.path(), 'utf8')).toContain(
+    '1\n00:00:00,000 --> 00:00:01,000\n[MOCK] Synthetic segment 1; not speech recognition.',
+  )
   await page.screenshot({ path: 'test-results/live-workspace.png', fullPage: true })
 })

@@ -53,7 +53,11 @@ export class Api {
     )
     if (!response.ok) {
       const body = await response.json().catch(() => ({}))
-      throw new Error(body.error?.message || `Export failed (${response.status})`)
+      throw new ApiError(
+        body.error?.code || 'request_failed',
+        body.error?.message || `Export failed (${response.status})`,
+        response.status,
+      )
     }
     return response.blob()
   }
